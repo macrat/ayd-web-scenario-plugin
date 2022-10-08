@@ -1,0 +1,10 @@
+t1 = tab.new()
+t1:go(TEST.url())
+assert(t1("body").text == "hello world!")
+assert(t1.title == "world - test")
+t1:close()
+
+t2 = tab.new(TEST.url("/?target=webscenario"))
+assert(t2("body").text == "hello webscenario!")
+assert(t2.title == "webscenario - test")
+t2:close()
