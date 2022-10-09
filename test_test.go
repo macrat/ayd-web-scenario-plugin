@@ -29,7 +29,7 @@ func StartTestServer() *httptest.Server {
 		w.Header().Set("content-type", "text/html")
 		fmt.Fprintf(w, `
 			<div><h1>text</h1><b>hello </b>beautiful <b>world</b><span>!</span></div>
-			<form><h1>form</h1><input type="text"><input type="text"></form>
+			<form action=GET><h1>form</h1><input type="text"><input type="text"></form>
 		`)
 	})
 

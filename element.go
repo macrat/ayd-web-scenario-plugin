@@ -146,6 +146,21 @@ func (e Element) GetValue(L *lua.LState) int {
 	return 1
 }
 
+func (e Element) GetAttribute(L *lua.LState) int {
+	name := L.CheckString(2)
+
+	var value string
+	var ok bool
+	e.tab.Run(L, chromedp.AttributeValue(e.ids, name, &value, &ok, chromedp.ByNodeID))
+
+	if ok {
+		L.Push(lua.LString(value))
+		return 1
+	} else {
+		return 0
+	}
+}
+
 func RegisterElementType(ctx context.Context, L *lua.LState) {
 	fn := func(f func(Element, *lua.LState)) *lua.LFunction {
 		return L.NewFunction(func(L *lua.LState) int {
@@ -194,7 +209,7 @@ func RegisterElementType(ctx context.Context, L *lua.LState) {
 				L.Push(f)
 				return 1
 			} else {
-				return 0
+				return CheckElement(L).GetAttribute(L)
 			}
 		},
 		"__tostring": func(L *lua.LState) int {

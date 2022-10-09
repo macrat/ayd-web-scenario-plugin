@@ -8,3 +8,6 @@ assert(t("#greeting").innerHTML == [[hello <b class="target">world</b>!]])
 
 assert(t(".target").outerHTML == [[<b class="target">world</b>]])
 assert(t("#greeting").outerHTML == [[<div id="greeting">hello <b class="target">world</b>!</div>]])
+
+assert(t(".target").class == "target")
+assert(t("#greeting").id == "greeting")

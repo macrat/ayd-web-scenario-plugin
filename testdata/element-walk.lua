@@ -35,3 +35,7 @@ assert(t:all("div")("h1").text == "text")
 assert(t:all("form")("h1").text == "form")
 assert(table.concat(t:all("div"):all("h1").text, "") == "text")
 assert(table.concat(t:all("form"):all("h1").text, "") == "form")
+
+
+assert(t("form").action == "GET")
+assert(t("input").type == "text")
