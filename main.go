@@ -2,8 +2,8 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"math"
 	"os"
 	"time"
 
@@ -11,59 +11,6 @@ import (
 	"github.com/macrat/ayd/lib-ayd"
 	"github.com/yuin/gopher-lua"
 )
-
-func asArray(t *lua.LTable) ([]interface{}, bool) {
-	isArray := true
-	values := make(map[int]lua.LValue)
-	t.ForEach(func(k, v lua.LValue) {
-		if n, ok := k.(lua.LNumber); ok {
-			if math.Mod(float64(n), 1) != 0 {
-				isArray = false
-			} else {
-				values[int(n)] = v
-			}
-		} else {
-			isArray = false
-		}
-	})
-	if !isArray {
-		return nil, false
-	}
-	result := make([]interface{}, len(values))
-	for i := 1; i <= len(values); i++ {
-		v, ok := values[i]
-		if !ok {
-			return nil, false
-		}
-		result[i-1] = UnpackLValue(v)
-	}
-	return result, true
-}
-
-func UnpackLValue(v lua.LValue) interface{} {
-	switch x := v.(type) {
-	case *lua.LNilType:
-		return nil
-	case lua.LBool:
-		return x == lua.LTrue
-	case lua.LNumber:
-		return float64(x)
-	case lua.LString:
-		return string(x)
-	case *lua.LTable:
-		if array, ok := asArray(x); ok {
-			return array
-		}
-
-		values := make(map[string]interface{})
-		x.ForEach(func(k, v lua.LValue) {
-			values[k.String()] = UnpackLValue(v)
-		})
-		return values
-	default:
-		return x.String()
-	}
-}
 
 func StartBrowser(ctx context.Context) (context.Context, context.CancelFunc) {
 	ctx, cancel := chromedp.NewContext(ctx,
@@ -93,15 +40,45 @@ func NewContext() (context.Context, context.CancelFunc) {
 	}
 }
 
-func NewLuaState(ctx context.Context) *lua.LState {
+func NewLuaState(ctx context.Context, logger *Logger) *lua.LState {
 	L := lua.NewState()
 
+	RegisterLogger(L, logger)
 	RegisterElementsArrayType(ctx, L)
 	RegisterElementType(ctx, L)
 	RegisterTabType(ctx, L)
 	RegisterTime(L)
 
 	return L
+}
+
+func RunWebScenario(target *ayd.URL, debug bool) ayd.Record {
+	logger := &Logger{Debug: debug, Status: ayd.StatusHealthy}
+
+	ctx, cancel := NewContext()
+	defer cancel()
+
+	L := NewLuaState(ctx, logger)
+	defer L.Close()
+
+	stime := time.Now()
+	err := L.DoFile(target.Opaque)
+	latency := time.Since(stime)
+
+	if err != nil {
+		var apierr *lua.ApiError
+		if errors.As(err, &apierr) {
+			logger.SetExtra("error", apierr.Object.String())
+			logger.SetExtra("trace", apierr.StackTrace)
+		} else {
+			logger.SetExtra("error", err.Error())
+		}
+		logger.Status = ayd.StatusFailure
+	}
+
+	r := logger.AsRecord()
+	r.Latency = latency
+	return r
 }
 
 func main() {
@@ -112,19 +89,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	logger := ayd.NewLogger(args.TargetURL)
-
-	ctx, cancel := NewContext()
-	defer cancel()
-
-	L := NewLuaState(ctx)
-	defer L.Close()
-
-	err = L.DoFile(args.TargetURL.Opaque)
-	if err != nil {
-		logger.Failure(err.Error(), nil)
-		return
-	}
-
-	logger.Healthy("", nil)
+	r := RunWebScenario(args.TargetURL, true)
+	ayd.NewLogger(args.TargetURL).Print(r)
 }

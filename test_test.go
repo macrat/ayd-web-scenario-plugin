@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -82,6 +83,16 @@ func StartTestServer() *httptest.Server {
 	return httptest.NewServer(mux)
 }
 
+func RegisterTestUtil(L *lua.LState, server *httptest.Server) {
+	tbl := L.SetFuncs(L.NewTable(), map[string]lua.LGFunction{
+		"url": func(L *lua.LState) int {
+			L.Push(lua.LString(server.URL + L.OptString(1, "")))
+			return 1
+		},
+	})
+	L.SetGlobal("TEST", tbl)
+}
+
 func DoLuaLine(L *lua.LState, script string) interface{} {
 	L.DoString("return " + script)
 	v := UnpackLValue(L.Get(1))
@@ -98,7 +109,7 @@ func AssertLuaLine(t *testing.T, L *lua.LState, script string, want interface{})
 }
 
 func Test_testSenarios(t *testing.T) {
-	files, err := filepath.Glob("_tests/*.lua")
+	files, err := filepath.Glob("testdata/*.lua")
 	if err != nil {
 		t.Fatalf("failed to get tests: %s", err)
 	}
@@ -113,16 +124,14 @@ func Test_testSenarios(t *testing.T) {
 	defer cancel()
 
 	for _, p := range files {
-		t.Run(filepath.Base(p), func(t *testing.T) {
-			L := NewLuaState(ctx)
-
-			tbl := L.SetFuncs(L.NewTable(), map[string]lua.LGFunction{
-				"url": func(L *lua.LState) int {
-					L.Push(lua.LString(server.URL + L.OptString(1, "")))
-					return 1
-				},
-			})
-			L.SetGlobal("TEST", tbl)
+		b := filepath.Base(p)
+		if strings.HasPrefix(b, "_") {
+			continue
+		}
+		t.Run(b, func(t *testing.T) {
+			logger := &Logger{Debug: true}
+			L := NewLuaState(ctx, logger)
+			RegisterTestUtil(L, server)
 
 			if err := L.DoFile(p); err != nil {
 				t.Fatalf(err.Error())

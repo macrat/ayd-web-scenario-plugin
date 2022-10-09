@@ -2,8 +2,9 @@ package main
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"os"
+	"time"
 
 	"github.com/chromedp/chromedp"
 	"github.com/yuin/gopher-lua"
@@ -27,11 +28,8 @@ func NewTab(ctx context.Context, L *lua.LState) *Tab {
 
 	t.Run(L, chromedp.EmulateViewport(t.width, t.height))
 
-	if L.GetTop() == 0 {
-		fmt.Printf("open new blank tab\n")
-	} else {
+	if L.GetTop() > 0 {
 		url := L.CheckString(1)
-		fmt.Printf("open %s on new tab\n", url)
 		t.Run(L, chromedp.Navigate(url))
 	}
 
@@ -51,34 +49,45 @@ func CheckTab(L *lua.LState) *Tab {
 
 func (t *Tab) Run(L *lua.LState, action ...chromedp.Action) {
 	if err := chromedp.Run(t.ctx, action...); err != nil {
-		L.RaiseError("%s", err)
+		if errors.Is(err, context.DeadlineExceeded) {
+			L.RaiseError("timeout")
+		} else {
+			L.RaiseError("%s", err)
+		}
+	}
+}
+
+func (t *Tab) RunSelector(L *lua.LState, query string, action ...chromedp.Action) {
+	ctx, cancel := context.WithTimeout(t.ctx, time.Second)
+	defer cancel()
+
+	if err := chromedp.Run(ctx, action...); err != nil {
+		if errors.Is(err, context.DeadlineExceeded) {
+			L.RaiseError("no such element: %s", query)
+		} else {
+			L.RaiseError("%s", err)
+		}
 	}
 }
 
 func (t *Tab) Go(L *lua.LState) {
 	url := L.CheckString(2)
-
-	fmt.Printf("navigate goto %s\n", url)
 	t.Run(L, chromedp.Navigate(url))
 }
 
 func (t *Tab) Forward(L *lua.LState) {
-	fmt.Printf("navigate go forward\n")
 	t.Run(L, chromedp.NavigateForward())
 }
 
 func (t *Tab) Back(L *lua.LState) {
-	fmt.Printf("navigate go back\n")
 	t.Run(L, chromedp.NavigateBack())
 }
 
 func (t *Tab) Reload(L *lua.LState) {
-	fmt.Printf("reload page\n")
 	t.Run(L, chromedp.Reload())
 }
 
 func (t *Tab) Close(L *lua.LState) {
-	fmt.Printf("close tab\n")
 	t.cancel()
 }
 
@@ -86,7 +95,6 @@ func (t *Tab) Screenshot(L *lua.LState) {
 	name := L.ToString(2)
 
 	var buf []byte
-	fmt.Printf("take a screenshot\n")
 	t.Run(L, chromedp.CaptureScreenshot(&buf))
 	os.WriteFile(name+".jpg", buf, 0644)
 }
@@ -96,7 +104,6 @@ func (t *Tab) SetViewport(L *lua.LState) {
 	h := L.CheckInt64(3)
 
 	// don't modify property of Tab before check both of arguments.
-	fmt.Printf("change viewport to %dx%d\n", w, h)
 	t.Run(L, chromedp.EmulateViewport(w, h))
 	t.width, t.height = w, h
 }
