@@ -16,10 +16,35 @@ type Tab struct {
 	width, height int64
 }
 
-func CheckTab(L *lua.LState) *Tab {
-	if t, ok := L.CheckUserData(1).Value.(*Tab); ok {
-		return t
+func NewTab(ctx context.Context, L *lua.LState) *Tab {
+	ctx, cancel := chromedp.NewContext(ctx)
+	t := &Tab{
+		ctx:    ctx,
+		cancel: cancel,
+		width:  1280,
+		height: 720,
 	}
+
+	t.Run(L, chromedp.EmulateViewport(t.width, t.height))
+
+	if L.GetTop() == 0 {
+		fmt.Printf("open new blank tab\n")
+	} else {
+		url := L.CheckString(1)
+		fmt.Printf("open %s on new tab\n", url)
+		t.Run(L, chromedp.Navigate(url))
+	}
+
+	return t
+}
+
+func CheckTab(L *lua.LState) *Tab {
+	if ud, ok := L.Get(1).(*lua.LUserData); ok {
+		if t, ok := ud.Value.(*Tab); ok {
+			return t
+		}
+	}
+
 	L.ArgError(1, "tab expected. perhaps you call it like tab.xxx() instead of tab:xxx().")
 	return nil
 }
@@ -30,99 +55,111 @@ func (t *Tab) Run(L *lua.LState, action ...chromedp.Action) {
 	}
 }
 
+func (t *Tab) Go(L *lua.LState) {
+	url := L.CheckString(2)
+
+	fmt.Printf("navigate goto %s\n", url)
+	t.Run(L, chromedp.Navigate(url))
+}
+
+func (t *Tab) Forward(L *lua.LState) {
+	fmt.Printf("navigate go forward\n")
+	t.Run(L, chromedp.NavigateForward())
+}
+
+func (t *Tab) Back(L *lua.LState) {
+	fmt.Printf("navigate go back\n")
+	t.Run(L, chromedp.NavigateBack())
+}
+
+func (t *Tab) Reload(L *lua.LState) {
+	fmt.Printf("reload page\n")
+	t.Run(L, chromedp.Reload())
+}
+
+func (t *Tab) Close(L *lua.LState) {
+	fmt.Printf("close tab\n")
+	t.cancel()
+}
+
+func (t *Tab) Screenshot(L *lua.LState) {
+	name := L.CheckString(2)
+
+	var buf []byte
+	fmt.Printf("take a screenshot\n")
+	CheckTab(L).Run(L, chromedp.CaptureScreenshot(&buf))
+	os.WriteFile(name, buf, 0644)
+}
+
+func (t *Tab) SetViewport(L *lua.LState) {
+	w := L.CheckInt64(2)
+	h := L.CheckInt64(3)
+
+	// don't modify property of Tab before check both of arguments.
+	fmt.Printf("change viewport to %dx%d\n", w, h)
+	t.Run(L, chromedp.EmulateViewport(w, h))
+	t.width, t.height = w, h
+}
+
+func (t *Tab) GetURL(L *lua.LState) int {
+	var url string
+	t.Run(L, chromedp.Location(&url))
+	L.Push(lua.LString(url))
+	return 1
+}
+
+func (t *Tab) GetTitle(L *lua.LState) int {
+	var title string
+	t.Run(L, chromedp.Title(&title))
+	L.Push(lua.LString(title))
+	return 1
+}
+
+func (t *Tab) GetViewport(L *lua.LState) int {
+	v := L.NewTable()
+	L.SetField(v, "width", lua.LNumber(t.width))
+	L.SetField(v, "height", lua.LNumber(t.height))
+	L.Push(v)
+	return 1
+}
+
 func RegisterTabType(ctx context.Context, L *lua.LState) {
+	fn := func(f func(*Tab, *lua.LState)) *lua.LFunction {
+		return L.NewFunction(func(L *lua.LState) int {
+			f(CheckTab(L), L)
+			L.Push(L.Get(1))
+			return 1
+		})
+	}
+
 	methods := map[string]*lua.LFunction{
-		"go": L.NewFunction(func(L *lua.LState) int {
-			url := L.CheckString(2)
-			fmt.Printf("navigate goto %s\n", url)
-			CheckTab(L).Run(L, chromedp.Navigate(url))
-
-			L.Push(L.Get(1))
-			return 1
-		}),
-		"forward": L.NewFunction(func(L *lua.LState) int {
-			fmt.Printf("navigate go forward\n")
-			CheckTab(L).Run(L, chromedp.NavigateForward())
-
-			L.Push(L.Get(1))
-			return 1
-		}),
-		"back": L.NewFunction(func(L *lua.LState) int {
-			fmt.Printf("navigate go back\n")
-			CheckTab(L).Run(L, chromedp.NavigateBack())
-
-			L.Push(L.Get(1))
-			return 1
-		}),
-		"reload": L.NewFunction(func(L *lua.LState) int {
-			fmt.Printf("reload page\n")
-			CheckTab(L).Run(L, chromedp.Reload())
-
-			L.Push(L.Get(1))
-			return 1
-		}),
-		"close": L.NewFunction(func(L *lua.LState) int {
-			fmt.Printf("close tab\n")
-			CheckTab(L).cancel()
-
-			L.Push(L.Get(1))
-			return 1
-		}),
-		"screenshot": L.NewFunction(func(L *lua.LState) int {
-			var buf []byte
-			name := L.CheckString(2)
-			CheckTab(L).Run(L, chromedp.CaptureScreenshot(&buf))
-			os.WriteFile(name, buf, 0644)
-
-			L.Push(L.Get(1))
-			return 1
-		}),
-		"wait": L.NewFunction(func(L *lua.LState) int {
-			fmt.Printf("wait for document ready\n")
-			CheckTab(L).Run(L, chromedp.WaitReady("document"))
-
-			L.Push(L.Get(1))
-			return 0
-		}),
-		"setViewport": L.NewFunction(func(L *lua.LState) int {
-			tab := CheckTab(L)
-			tab.width = L.CheckInt64(2)
-			tab.height = L.CheckInt64(3)
-			fmt.Printf("change viewport to %dx%d\n", tab.width, tab.height)
-			tab.Run(L, chromedp.EmulateViewport(tab.width, tab.height))
-
-			L.Push(L.Get(1))
-			return 0
-		}),
+		"go":          fn((*Tab).Go),
+		"forward":     fn((*Tab).Forward),
+		"back":        fn((*Tab).Back),
+		"reload":      fn((*Tab).Reload),
+		"close":       fn((*Tab).Close),
+		"screenshot":  fn((*Tab).Screenshot),
+		"setViewport": fn((*Tab).SetViewport),
 		"all": L.NewFunction(func(L *lua.LState) int {
 			t := CheckTab(L)
-			L.Push(NewElementArray(L, t, L.CheckString(2)))
+			query := L.CheckString(2)
+
+			fmt.Printf("select %s\n", query)
+			L.Push(NewElementArray(L, t, query))
 			return 1
 		}),
 	}
 
+	getters := map[string]func(*Tab, *lua.LState) int{
+		"url":      (*Tab).GetURL,
+		"title":    (*Tab).GetTitle,
+		"viewport": (*Tab).GetViewport,
+	}
+
 	tab := L.SetFuncs(L.NewTypeMetatable("tab"), map[string]lua.LGFunction{
 		"new": func(L *lua.LState) int {
-			ctx, cancel := chromedp.NewContext(ctx)
-			tab := &Tab{
-				ctx:    ctx,
-				cancel: cancel,
-				width:  1280,
-				height: 720,
-			}
-
-			tab.Run(L, chromedp.EmulateViewport(tab.width, tab.height))
-
-			if L.GetTop() == 0 {
-				fmt.Printf("open new blank tab\n")
-			} else {
-				url := L.CheckString(1)
-				fmt.Printf("open %s on new tab\n", url)
-				tab.Run(L, chromedp.Navigate(url))
-			}
-
 			t := L.NewUserData()
-			t.Value = tab
+			t.Value = NewTab(ctx, L)
 			L.SetMetatable(t, L.GetTypeMetatable("tab"))
 			L.Push(t)
 			return 1
@@ -135,31 +172,13 @@ func RegisterTabType(ctx context.Context, L *lua.LState) {
 		"__index": func(L *lua.LState) int {
 			name := L.CheckString(2)
 
-			switch name {
-			case "url":
-				var url string
-				CheckTab(L).Run(L, chromedp.Location(&url))
-				L.Push(lua.LString(url))
+			if f, ok := getters[name]; ok {
+				return f(CheckTab(L), L)
+			} else if f, ok := methods[name]; ok {
+				L.Push(f)
 				return 1
-			case "title":
-				var title string
-				CheckTab(L).Run(L, chromedp.Title(&title))
-				L.Push(lua.LString(title))
-				return 1
-			case "viewport":
-				t := CheckTab(L)
-				v := L.NewTable()
-				L.SetField(v, "width", lua.LNumber(t.width))
-				L.SetField(v, "height", lua.LNumber(t.height))
-				L.Push(v)
-				return 1
-			default:
-				if f, ok := methods[name]; ok {
-					L.Push(f)
-					return 1
-				} else {
-					return 0
-				}
+			} else {
+				return 0
 			}
 		},
 		"__tostring": func(L *lua.LState) int {
