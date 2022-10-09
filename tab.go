@@ -144,8 +144,8 @@ func RegisterTabType(ctx context.Context, L *lua.LState) {
 			t := CheckTab(L)
 			query := L.CheckString(2)
 
-			fmt.Printf("select %s\n", query)
-			L.Push(NewElementArray(L, t, query))
+			fmt.Printf("select all %s\n", query)
+			L.Push(NewElementsArray(L, t, query))
 			return 1
 		}),
 	}
@@ -166,7 +166,10 @@ func RegisterTabType(ctx context.Context, L *lua.LState) {
 		},
 		"__call": func(L *lua.LState) int {
 			t := CheckTab(L)
-			L.Push(NewElement(L, t, L.CheckString(2)).ToLua(L))
+			query := L.CheckString(2)
+
+			fmt.Printf("select %s\n", query)
+			L.Push(NewElement(L, t, query).ToLua(L))
 			return 1
 		},
 		"__index": func(L *lua.LState) int {

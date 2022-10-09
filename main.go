@@ -96,6 +96,7 @@ func NewContext() (context.Context, context.CancelFunc) {
 func NewLuaState(ctx context.Context) *lua.LState {
 	L := lua.NewState()
 
+	RegisterElementsArrayType(ctx, L)
 	RegisterElementType(ctx, L)
 	RegisterTabType(ctx, L)
 	RegisterTime(L)

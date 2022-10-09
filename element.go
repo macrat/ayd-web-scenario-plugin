@@ -34,22 +34,6 @@ func (e Element) ToLua(L *lua.LState) *lua.LUserData {
 	return ud
 }
 
-func NewElementArray(L *lua.LState, t *Tab, query string) *lua.LTable {
-	var ids []cdp.NodeID
-	t.Run(L, chromedp.NodeIDs(query, &ids, chromedp.ByQueryAll))
-
-	es := L.NewTable()
-	for _, id := range ids {
-		e := Element{
-			query: query,
-			ids:   []cdp.NodeID{id},
-			tab:   t,
-		}
-		es.Append(e.ToLua(L))
-	}
-	return es
-}
-
 func CheckElement(L *lua.LState) Element {
 	if ud, ok := L.Get(1).(*lua.LUserData); ok {
 		if e, ok := ud.Value.(Element); ok {
@@ -74,7 +58,7 @@ func (e Element) SendKeys(L *lua.LState) {
 }
 
 func (e Element) SetValue(L *lua.LState) {
-	value := L.ToString(3)
+	value := L.ToString(2)
 
 	fmt.Printf("set value %q to %s\n", value, e.query)
 	e.tab.Run(L, chromedp.SetValue(e.ids, value, chromedp.ByNodeID))
@@ -183,7 +167,7 @@ func RegisterElementType(ctx context.Context, L *lua.LState) {
 		},
 		"__tostring": func(L *lua.LState) int {
 			e := CheckElement(L)
-			L.Push(lua.LString(fmt.Sprintf("[%d elements]{%s}", len(e.ids), e.query)))
+			L.Push(lua.LString(fmt.Sprintf("{%s}", e.query)))
 			return 1
 		},
 	})
