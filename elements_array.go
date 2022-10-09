@@ -11,21 +11,29 @@ import (
 
 type ElementsArray []Element
 
-func NewElementsArray(L *lua.LState, t *Tab, query string) *lua.LTable {
+func NewElementsArray(L *lua.LState, t *Tab, query string) ElementsArray {
 	var ids []cdp.NodeID
-	t.Run(L, chromedp.NodeIDs(query, &ids, chromedp.ByQueryAll))
+	t.Run(L, chromedp.NodeIDs(query, &ids, chromedp.ByQueryAll, chromedp.AtLeast(0)))
 
-	es := L.NewTable()
+	var es ElementsArray
 	for _, id := range ids {
 		e := Element{
 			query: query,
 			ids:   []cdp.NodeID{id},
 			tab:   t,
 		}
-		es.Append(e.ToLua(L))
+		es = append(es, e)
 	}
-	L.SetMetatable(es, L.GetTypeMetatable("elementsarray"))
 	return es
+}
+
+func (es ElementsArray) ToLua(L *lua.LState) *lua.LTable {
+	tbl := L.NewTable()
+	for _, e := range es {
+		tbl.Append(e.ToLua(L))
+	}
+	L.SetMetatable(tbl, L.GetTypeMetatable("elementsarray"))
+	return tbl
 }
 
 func CheckElementsArray(L *lua.LState) ElementsArray {
@@ -63,14 +71,6 @@ func RegisterElementsArrayType(ctx context.Context, L *lua.LState) {
 		})
 	}
 
-	methods := map[string]*lua.LFunction{
-		"wait":     runAll(Element.Wait),
-		"sendKeys": runAll(Element.SendKeys),
-		"setValue": runAll(Element.SetValue),
-		"click":    runAll(Element.Click),
-		"submit":   runAll(Element.Submit),
-	}
-
 	getAll := func(f func(Element, *lua.LState) int) func(ElementsArray, *lua.LState) int {
 		return func(es ElementsArray, L *lua.LState) int {
 			rs := L.NewTable()
@@ -86,6 +86,22 @@ func RegisterElementsArrayType(ctx context.Context, L *lua.LState) {
 		}
 	}
 
+	methods := map[string]*lua.LFunction{
+		"all": L.NewFunction(func(L *lua.LState) int {
+			query := L.CheckString(2)
+			var es ElementsArray
+			for _, e := range CheckElementsArray(L) {
+				es = append(es, e.SelectAll(L, query)...)
+			}
+			L.Push(es.ToLua(L))
+			return 1
+		}),
+		"sendKeys": runAll(Element.SendKeys),
+		"setValue": runAll(Element.SetValue),
+		"click":    runAll(Element.Click),
+		"submit":   runAll(Element.Submit),
+	}
+
 	getters := map[string]func(ElementsArray, *lua.LState) int{
 		"text":      getAll(Element.GetText),
 		"innerHTML": getAll(Element.GetInnerHTML),
@@ -94,6 +110,18 @@ func RegisterElementsArrayType(ctx context.Context, L *lua.LState) {
 	}
 
 	query := L.SetFuncs(L.NewTypeMetatable("elementsarray"), map[string]lua.LGFunction{
+		"__call": func(L *lua.LState) int {
+			query := L.CheckString(2)
+			for _, e := range CheckElementsArray(L) {
+				es := e.SelectAll(L, query)
+				if len(es) > 0 {
+					L.Push(es[0].ToLua(L))
+					return 1
+				}
+			}
+			L.RaiseError("no such element")
+			return 0
+		},
 		"__index": func(L *lua.LState) int {
 			name := L.CheckString(2)
 

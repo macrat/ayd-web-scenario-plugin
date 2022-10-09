@@ -83,12 +83,12 @@ func (t *Tab) Close(L *lua.LState) {
 }
 
 func (t *Tab) Screenshot(L *lua.LState) {
-	name := L.CheckString(2)
+	name := L.ToString(2)
 
 	var buf []byte
 	fmt.Printf("take a screenshot\n")
-	CheckTab(L).Run(L, chromedp.CaptureScreenshot(&buf))
-	os.WriteFile(name, buf, 0644)
+	t.Run(L, chromedp.CaptureScreenshot(&buf))
+	os.WriteFile(name+".jpg", buf, 0644)
 }
 
 func (t *Tab) SetViewport(L *lua.LState) {
@@ -99,6 +99,12 @@ func (t *Tab) SetViewport(L *lua.LState) {
 	fmt.Printf("change viewport to %dx%d\n", w, h)
 	t.Run(L, chromedp.EmulateViewport(w, h))
 	t.width, t.height = w, h
+}
+
+func (t *Tab) Wait(L *lua.LState) {
+	query := L.CheckString(2)
+
+	t.Run(L, chromedp.WaitVisible(query, chromedp.ByQuery))
 }
 
 func (t *Tab) GetURL(L *lua.LState) int {
@@ -140,12 +146,9 @@ func RegisterTabType(ctx context.Context, L *lua.LState) {
 		"close":       fn((*Tab).Close),
 		"screenshot":  fn((*Tab).Screenshot),
 		"setViewport": fn((*Tab).SetViewport),
+		"wait":        fn((*Tab).Wait),
 		"all": L.NewFunction(func(L *lua.LState) int {
-			t := CheckTab(L)
-			query := L.CheckString(2)
-
-			fmt.Printf("select all %s\n", query)
-			L.Push(NewElementsArray(L, t, query))
+			L.Push(NewElementsArray(L, CheckTab(L), L.CheckString(2)).ToLua(L))
 			return 1
 		}),
 	}
@@ -165,11 +168,7 @@ func RegisterTabType(ctx context.Context, L *lua.LState) {
 			return 1
 		},
 		"__call": func(L *lua.LState) int {
-			t := CheckTab(L)
-			query := L.CheckString(2)
-
-			fmt.Printf("select %s\n", query)
-			L.Push(NewElement(L, t, query).ToLua(L))
+			L.Push(NewElement(L, CheckTab(L), L.CheckString(2)).ToLua(L))
 			return 1
 		},
 		"__index": func(L *lua.LState) int {

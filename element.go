@@ -45,9 +45,43 @@ func CheckElement(L *lua.LState) Element {
 	return Element{}
 }
 
-func (e Element) Wait(L *lua.LState) {
-	fmt.Printf("waiting for %s\n", e.query)
-	e.tab.Run(L, chromedp.WaitReady(e.ids, chromedp.ByNodeID))
+func (e Element) Select(L *lua.LState, query string) Element {
+	var nodes []*cdp.Node
+	e.tab.Run(L, chromedp.Nodes(e.ids, &nodes, chromedp.ByNodeID))
+
+	var ids []cdp.NodeID
+	e.tab.Run(L, chromedp.NodeIDs(query, &ids, chromedp.ByQuery, chromedp.FromNode(nodes[0])))
+
+	return Element{
+		query: query,
+		ids:   ids,
+		tab:   e.tab,
+	}
+}
+
+func (e Element) SelectAll(L *lua.LState, query string) ElementsArray {
+	var nodes []*cdp.Node
+	e.tab.Run(L, chromedp.Nodes(e.ids, &nodes, chromedp.ByNodeID))
+
+	var es ElementsArray
+	for _, node := range nodes {
+		var ids []cdp.NodeID
+		e.tab.Run(L, chromedp.NodeIDs(
+			query,
+			&ids,
+			chromedp.ByQueryAll,
+			chromedp.FromNode(node),
+			chromedp.AtLeast(0),
+		))
+		for _, id := range ids {
+			es = append(es, Element{
+				query: query,
+				ids:   []cdp.NodeID{id},
+				tab:   e.tab,
+			})
+		}
+	}
+	return es
 }
 
 func (e Element) SendKeys(L *lua.LState) {
@@ -85,12 +119,12 @@ func (e Element) Blur(L *lua.LState) {
 }
 
 func (e Element) Screenshot(L *lua.LState) {
-	name := L.CheckString(2)
+	name := L.ToString(2)
 
 	var buf []byte
 	fmt.Printf("take a screenshot of %s\n", e.query)
 	e.tab.Run(L, chromedp.Screenshot(e.ids, &buf, chromedp.ByNodeID))
-	os.WriteFile(name, buf, 0644)
+	os.WriteFile(name+".jpg", buf, 0644)
 }
 
 func (e Element) GetText(L *lua.LState) int {
@@ -135,7 +169,12 @@ func RegisterElementType(ctx context.Context, L *lua.LState) {
 	}
 
 	methods := map[string]*lua.LFunction{
-		"wait":       fn(Element.Wait),
+		"all": L.NewFunction(func(L *lua.LState) int {
+			e := CheckElement(L)
+			query := L.CheckString(2)
+			L.Push(e.SelectAll(L, query).ToLua(L))
+			return 1
+		}),
 		"sendKeys":   fn(Element.SendKeys),
 		"setValue":   fn(Element.SetValue),
 		"click":      fn(Element.Click),
@@ -153,6 +192,12 @@ func RegisterElementType(ctx context.Context, L *lua.LState) {
 	}
 
 	query := L.SetFuncs(L.NewTypeMetatable("element"), map[string]lua.LGFunction{
+		"__call": func(L *lua.LState) int {
+			e := CheckElement(L)
+			query := L.CheckString(2)
+			L.Push(e.Select(L, query).ToLua(L))
+			return 1
+		},
 		"__index": func(L *lua.LState) int {
 			name := L.CheckString(2)
 
