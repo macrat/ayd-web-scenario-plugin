@@ -109,6 +109,8 @@ func AssertLuaLine(t *testing.T, L *lua.LState, script string, want any) {
 }
 
 func Test_testSenarios(t *testing.T) {
+	t.Setenv("TZ", "UTC")
+
 	files, err := filepath.Glob("testdata/*.lua")
 	if err != nil {
 		t.Fatalf("failed to get tests: %s", err)
