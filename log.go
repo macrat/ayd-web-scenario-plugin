@@ -14,10 +14,10 @@ type Logger struct {
 	Debug  bool
 	Logs   []string
 	Status ayd.Status
-	Extra  map[string]interface{}
+	Extra  map[string]any
 }
 
-func (l *Logger) Print(values ...interface{}) {
+func (l *Logger) Print(values ...any) {
 	switch len(values) {
 	case 0:
 		return
@@ -59,9 +59,9 @@ func (l *Logger) SetStatus(status string) {
 	}
 }
 
-func (l *Logger) SetExtra(k string, v interface{}) {
+func (l *Logger) SetExtra(k string, v any) {
 	if l.Extra == nil {
-		l.Extra = make(map[string]interface{})
+		l.Extra = make(map[string]any)
 	}
 	l.Extra[k] = v
 
@@ -85,7 +85,7 @@ func RegisterLogger(L *lua.LState, logger *Logger) {
 	})
 	L.SetMetatable(tbl, L.SetFuncs(L.NewTable(), map[string]lua.LGFunction{
 		"__call": func(L *lua.LState) int {
-			var xs []interface{}
+			var xs []any
 			for i := 2; i <= L.GetTop(); i++ {
 				xs = append(xs, UnpackLValue(L.Get(i)))
 			}

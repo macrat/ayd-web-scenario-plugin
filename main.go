@@ -14,13 +14,13 @@ import (
 
 func StartBrowser(ctx context.Context) (context.Context, context.CancelFunc) {
 	ctx, cancel := chromedp.NewContext(ctx,
-		chromedp.WithLogf(func(s string, args ...interface{}) {
+		chromedp.WithLogf(func(s string, args ...any) {
 			fmt.Printf("log"+s+"\n", args)
 		}),
-		//chromedp.WithDebugf(func(s string, args ...interface{}) {
+		//chromedp.WithDebugf(func(s string, args ...any) {
 		//	fmt.Printf("debug" + s + "\n", args)
 		//}),
-		chromedp.WithErrorf(func(s string, args ...interface{}) {
+		chromedp.WithErrorf(func(s string, args ...any) {
 			fmt.Printf("error"+s+"\n", args)
 		}),
 	)

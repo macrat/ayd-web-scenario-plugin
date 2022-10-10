@@ -52,7 +52,7 @@ func TestRunWebScenario(t *testing.T) {
 			Record: ayd.Record{
 				Status:  ayd.StatusFailure,
 				Message: "It's working!",
-				Extra: map[string]interface{}{
+				Extra: map[string]any{
 					"error": "./testdata/_main-test.lua:13: assertion failed!",
 					"trace": "stack traceback:\n\t[G]: in function 'assert'\n\t./testdata/_main-test.lua:13: in main chunk\n\t[G]: ?",
 				},
@@ -65,7 +65,7 @@ func TestRunWebScenario(t *testing.T) {
 			Record: ayd.Record{
 				Status:  ayd.StatusFailure,
 				Message: "It's working!",
-				Extra: map[string]interface{}{
+				Extra: map[string]any{
 					"msg":   "hello",
 					"error": "./testdata/_main-test.lua:13: assertion failed!",
 					"trace": "stack traceback:\n\t[G]: in function 'assert'\n\t./testdata/_main-test.lua:13: in main chunk\n\t[G]: ?",
@@ -78,7 +78,7 @@ func TestRunWebScenario(t *testing.T) {
 			Record: ayd.Record{
 				Status:  ayd.StatusHealthy,
 				Message: "It's working!",
-				Extra: map[string]interface{}{
+				Extra: map[string]any{
 					"msg": "hello",
 				},
 			},
@@ -89,7 +89,7 @@ func TestRunWebScenario(t *testing.T) {
 			Record: ayd.Record{
 				Status:  ayd.StatusFailure,
 				Message: "It's working!",
-				Extra: map[string]interface{}{
+				Extra: map[string]any{
 					"error": "./testdata/_main-test.lua:16: something",
 					"trace": "stack traceback:\n\t[G]: in function 'error'\n\t./testdata/_main-test.lua:16: in main chunk\n\t[G]: ?",
 				},

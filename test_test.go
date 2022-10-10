@@ -93,14 +93,14 @@ func RegisterTestUtil(L *lua.LState, server *httptest.Server) {
 	L.SetGlobal("TEST", tbl)
 }
 
-func DoLuaLine(L *lua.LState, script string) interface{} {
+func DoLuaLine(L *lua.LState, script string) any {
 	L.DoString("return " + script)
 	v := UnpackLValue(L.Get(1))
 	L.Pop(1)
 	return v
 }
 
-func AssertLuaLine(t *testing.T, L *lua.LState, script string, want interface{}) {
+func AssertLuaLine(t *testing.T, L *lua.LState, script string, want any) {
 	t.Helper()
 
 	if diff := cmp.Diff(DoLuaLine(L, script), want); diff != "" {
