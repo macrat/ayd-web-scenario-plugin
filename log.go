@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"math"
 	"os"
 	"strings"
 
@@ -95,57 +94,4 @@ func RegisterLogger(L *lua.LState, logger *Logger) {
 		},
 	}))
 	L.SetGlobal("print", tbl)
-}
-
-func asArray(t *lua.LTable) ([]interface{}, bool) {
-	isArray := true
-	values := make(map[int]lua.LValue)
-	t.ForEach(func(k, v lua.LValue) {
-		if n, ok := k.(lua.LNumber); ok {
-			if math.Mod(float64(n), 1) != 0 {
-				isArray = false
-			} else {
-				values[int(n)] = v
-			}
-		} else {
-			isArray = false
-		}
-	})
-	if !isArray {
-		return nil, false
-	}
-	result := make([]interface{}, len(values))
-	for i := 1; i <= len(values); i++ {
-		v, ok := values[i]
-		if !ok {
-			return nil, false
-		}
-		result[i-1] = UnpackLValue(v)
-	}
-	return result, true
-}
-
-func UnpackLValue(v lua.LValue) interface{} {
-	switch x := v.(type) {
-	case *lua.LNilType:
-		return nil
-	case lua.LBool:
-		return x == lua.LTrue
-	case lua.LNumber:
-		return float64(x)
-	case lua.LString:
-		return string(x)
-	case *lua.LTable:
-		if array, ok := asArray(x); ok {
-			return array
-		}
-
-		values := make(map[string]interface{})
-		x.ForEach(func(k, v lua.LValue) {
-			values[k.String()] = UnpackLValue(v)
-		})
-		return values
-	default:
-		return x.String()
-	}
 }

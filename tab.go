@@ -114,6 +114,15 @@ func (t *Tab) Wait(L *lua.LState) {
 	t.Run(L, chromedp.WaitVisible(query, chromedp.ByQuery))
 }
 
+func (t *Tab) Eval(L *lua.LState) int {
+	script := L.CheckString(2)
+
+	var res any
+	t.Run(L, chromedp.Evaluate(script, &res))
+	L.Push(PackLValue(L, res))
+	return 1
+}
+
 func (t *Tab) GetURL(L *lua.LState) int {
 	var url string
 	t.Run(L, chromedp.Location(&url))
@@ -157,6 +166,9 @@ func RegisterTabType(ctx context.Context, L *lua.LState) {
 		"all": L.NewFunction(func(L *lua.LState) int {
 			L.Push(NewElementsArray(L, CheckTab(L), L.CheckString(2)).ToLua(L))
 			return 1
+		}),
+		"eval": L.NewFunction(func(L *lua.LState) int {
+			return CheckTab(L).Eval(L)
 		}),
 	}
 
