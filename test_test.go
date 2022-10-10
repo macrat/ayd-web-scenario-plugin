@@ -93,6 +93,14 @@ func StartTestServer() *httptest.Server {
 		fmt.Fprintf(w, `<span></span><script>document.querySelector('span').innerText = JSON.stringify(prompt('type something here!'))</script>`)
 	})
 
+	mux.HandleFunc("/download", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintf(w, `<a href="/download/data.txt">download</a>`)
+	})
+	mux.HandleFunc("/download/data.txt", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("content-type", "application/octet-stream")
+		fmt.Fprintf(w, `this is a data`)
+	})
+
 	return httptest.NewServer(mux)
 }
 
@@ -144,8 +152,13 @@ func Test_testSenarios(t *testing.T) {
 			continue
 		}
 		t.Run(b, func(t *testing.T) {
+			s, err := NewStorage(t.TempDir(), p, time.Now())
+			if err != nil {
+				t.Fatalf("failed to prepare storage: %s", err)
+			}
+
 			logger := &Logger{Debug: true}
-			L := NewLuaState(ctx, logger)
+			L := NewLuaState(ctx, logger, s)
 			RegisterTestUtil(L, server)
 
 			if err := L.DoFile(p); err != nil {

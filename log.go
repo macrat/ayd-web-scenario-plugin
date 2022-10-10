@@ -5,12 +5,15 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"sync"
 
 	"github.com/macrat/ayd/lib-ayd"
 	"github.com/yuin/gopher-lua"
 )
 
 type Logger struct {
+	sync.Mutex
+
 	Debug  bool
 	Logs   []string
 	Status ayd.Status
@@ -18,6 +21,9 @@ type Logger struct {
 }
 
 func (l *Logger) Print(values ...any) {
+	l.Lock()
+	defer l.Unlock()
+
 	switch len(values) {
 	case 0:
 		return
@@ -39,19 +45,21 @@ func (l *Logger) Print(values ...any) {
 	}
 }
 
-func (l *Logger) AsString() string {
-	return strings.Join(l.Logs, "\n")
-}
-
 func (l *Logger) AsRecord() ayd.Record {
+	l.Lock()
+	defer l.Unlock()
+
 	return ayd.Record{
 		Status:  l.Status,
-		Message: l.AsString(),
+		Message: strings.Join(l.Logs, "\n"),
 		Extra:   l.Extra,
 	}
 }
 
 func (l *Logger) SetStatus(status string) {
+	l.Lock()
+	defer l.Unlock()
+
 	l.Status = ayd.ParseStatus(status)
 
 	if l.Debug {
@@ -60,6 +68,9 @@ func (l *Logger) SetStatus(status string) {
 }
 
 func (l *Logger) SetExtra(k string, v any) {
+	l.Lock()
+	defer l.Unlock()
+
 	if l.Extra == nil {
 		l.Extra = make(map[string]any)
 	}

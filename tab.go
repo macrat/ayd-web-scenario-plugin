@@ -3,32 +3,38 @@ package main
 import (
 	"context"
 	"errors"
-	"os"
 	"time"
 
+	"github.com/chromedp/cdproto/browser"
 	"github.com/chromedp/cdproto/page"
 	"github.com/chromedp/chromedp"
 	"github.com/yuin/gopher-lua"
 )
 
 type Tab struct {
-	ctx    context.Context
-	cancel context.CancelFunc
+	ctx     context.Context
+	cancel  context.CancelFunc
+	storage *Storage
 
 	width, height int64
 	onDialog      *lua.LFunction
 }
 
-func NewTab(ctx context.Context, L *lua.LState) *Tab {
+func NewTab(ctx context.Context, L *lua.LState, s *Storage) *Tab {
 	ctx, cancel := chromedp.NewContext(ctx)
 	t := &Tab{
-		ctx:    ctx,
-		cancel: cancel,
-		width:  1280,
-		height: 720,
+		ctx:     ctx,
+		cancel:  cancel,
+		storage: s,
+		width:   1280,
+		height:  720,
 	}
 
-	t.Run(L, chromedp.EmulateViewport(t.width, t.height))
+	t.Run(
+		L,
+		browser.SetDownloadBehavior(browser.SetDownloadBehaviorBehaviorAllow).WithDownloadPath(s.Dir).WithEventsEnabled(true),
+		chromedp.EmulateViewport(t.width, t.height),
+	)
 
 	if L.GetTop() > 0 {
 		url := L.CheckString(1)
@@ -56,6 +62,15 @@ func (t *Tab) ToLua(L *lua.LState) *lua.LUserData {
 
 	chromedp.ListenTarget(t.ctx, func(ev any) {
 		switch e := ev.(type) {
+		case *browser.EventDownloadWillBegin:
+			t.storage.StartDownload(e.GUID, e.SuggestedFilename)
+		case *browser.EventDownloadProgress:
+			switch e.State {
+			case browser.DownloadProgressStateCompleted:
+				t.storage.CompleteDownload(e.GUID)
+			case browser.DownloadProgressStateCanceled:
+				t.storage.CancelDownload(e.GUID)
+			}
 		case *page.EventJavascriptDialogOpening:
 			if t.onDialog == nil {
 				page.HandleJavaScriptDialog(true)
@@ -89,6 +104,13 @@ func (t *Tab) Run(L *lua.LState, action ...chromedp.Action) {
 		} else {
 			L.RaiseError("%s", err)
 		}
+	}
+}
+
+func (t *Tab) Save(L *lua.LState, name, ext string, data []byte) {
+	err := t.storage.Save(name, ext, data)
+	if err != nil {
+		L.RaiseError("%s", err)
 	}
 }
 
@@ -131,7 +153,7 @@ func (t *Tab) Screenshot(L *lua.LState) {
 
 	var buf []byte
 	t.Run(L, chromedp.CaptureScreenshot(&buf))
-	os.WriteFile(name+".jpg", buf, 0644)
+	t.Save(L, name, ".jpg", buf)
 }
 
 func (t *Tab) SetViewport(L *lua.LState) {
@@ -184,7 +206,7 @@ func (t *Tab) GetViewport(L *lua.LState) int {
 	return 1
 }
 
-func RegisterTabType(ctx context.Context, L *lua.LState) {
+func RegisterTabType(ctx context.Context, L *lua.LState, s *Storage) {
 	fn := func(f func(*Tab, *lua.LState)) *lua.LFunction {
 		return L.NewFunction(func(L *lua.LState) int {
 			f(CheckTab(L), L)
@@ -220,7 +242,7 @@ func RegisterTabType(ctx context.Context, L *lua.LState) {
 
 	tab := L.SetFuncs(L.NewTypeMetatable("tab"), map[string]lua.LGFunction{
 		"new": func(L *lua.LState) int {
-			L.Push(NewTab(ctx, L).ToLua(L))
+			L.Push(NewTab(ctx, L, s).ToLua(L))
 			return 1
 		},
 		"__call": func(L *lua.LState) int {

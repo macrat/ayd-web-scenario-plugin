@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"os"
 
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/chromedp"
@@ -115,7 +114,7 @@ func (e Element) Screenshot(L *lua.LState) {
 
 	var buf []byte
 	e.tab.Run(L, chromedp.Screenshot(e.ids, &buf, chromedp.ByNodeID))
-	os.WriteFile(name+".jpg", buf, 0644)
+	e.tab.Save(L, name, ".jpg", buf)
 }
 
 func (e Element) GetText(L *lua.LState) int {

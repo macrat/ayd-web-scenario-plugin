@@ -40,13 +40,13 @@ func NewContext() (context.Context, context.CancelFunc) {
 	}
 }
 
-func NewLuaState(ctx context.Context, logger *Logger) *lua.LState {
+func NewLuaState(ctx context.Context, logger *Logger, s *Storage) *lua.LState {
 	L := lua.NewState()
 
 	RegisterLogger(L, logger)
 	RegisterElementsArrayType(ctx, L)
 	RegisterElementType(ctx, L)
-	RegisterTabType(ctx, L)
+	RegisterTabType(ctx, L, s)
 	RegisterTime(L)
 
 	return L
@@ -58,11 +58,21 @@ func RunWebScenario(target *ayd.URL, debug bool) ayd.Record {
 	ctx, cancel := NewContext()
 	defer cancel()
 
-	L := NewLuaState(ctx, logger)
-	defer L.Close()
+	baseDir := os.Getenv("WEBSCENARIO_ARTIFACT_DIR")
 
 	stime := time.Now()
-	err := L.DoFile(target.Opaque)
+
+	storage, err := NewStorage(baseDir, target.Opaque, stime)
+	if err != nil {
+		return ayd.Record{
+			Status:  ayd.StatusFailure,
+			Message: err.Error(),
+		}
+	}
+	L := NewLuaState(ctx, logger, storage)
+	defer L.Close()
+
+	err = L.DoFile(target.Opaque)
 	latency := time.Since(stime)
 
 	if err != nil {
@@ -76,7 +86,12 @@ func RunWebScenario(target *ayd.URL, debug bool) ayd.Record {
 		logger.Status = ayd.StatusFailure
 	}
 
+	if xs := storage.Artifacts(); len(xs) > 0 {
+		logger.SetExtra("artifacts", xs)
+	}
+
 	r := logger.AsRecord()
+	r.Time = stime
 	r.Latency = latency
 	return r
 }

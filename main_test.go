@@ -12,7 +12,9 @@ func TestRunWebScenario(t *testing.T) {
 	server := StartTestServer()
 	defer server.Close()
 
+	t.Setenv("TZ", "UTC")
 	t.Setenv("TEST_URL", server.URL)
+	t.Setenv("WEBSCENARIO_ARTIFACT_DIR", t.TempDir())
 
 	tests := []struct {
 		Status string
