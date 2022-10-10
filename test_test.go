@@ -80,6 +80,19 @@ func StartTestServer() *httptest.Server {
 		`)
 	})
 
+	mux.HandleFunc("/dialog/alert", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("content-type", "text/html")
+		fmt.Fprintf(w, `<script>alert('welcome!')</script>`)
+	})
+	mux.HandleFunc("/dialog/confirm", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("content-type", "text/html")
+		fmt.Fprintf(w, `<span></span><script>document.querySelector('span').innerText = confirm('are you sure?')</script>`)
+	})
+	mux.HandleFunc("/dialog/prompt", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("content-type", "text/html")
+		fmt.Fprintf(w, `<span></span><script>document.querySelector('span').innerText = JSON.stringify(prompt('type something here!'))</script>`)
+	})
+
 	return httptest.NewServer(mux)
 }
 

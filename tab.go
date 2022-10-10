@@ -6,6 +6,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/chromedp/cdproto/page"
 	"github.com/chromedp/chromedp"
 	"github.com/yuin/gopher-lua"
 )
@@ -15,6 +16,7 @@ type Tab struct {
 	cancel context.CancelFunc
 
 	width, height int64
+	onDialog      *lua.LFunction
 }
 
 func NewTab(ctx context.Context, L *lua.LState) *Tab {
@@ -45,6 +47,39 @@ func CheckTab(L *lua.LState) *Tab {
 
 	L.ArgError(1, "tab expected. perhaps you call it like tab.xxx() instead of tab:xxx().")
 	return nil
+}
+
+func (t *Tab) ToLua(L *lua.LState) *lua.LUserData {
+	lt := L.NewUserData()
+	lt.Value = t
+	L.SetMetatable(lt, L.GetTypeMetatable("tab"))
+
+	chromedp.ListenTarget(t.ctx, func(ev any) {
+		switch e := ev.(type) {
+		case *page.EventJavascriptDialogOpening:
+			if t.onDialog == nil {
+				page.HandleJavaScriptDialog(true)
+			} else {
+				L.Push(t.onDialog)
+				L.Push(lua.LString(e.Type))
+				L.Push(lua.LString(e.Message))
+				L.Push(lua.LString(e.URL))
+				L.Call(3, 2)
+
+				action := page.HandleJavaScriptDialog(L.ToBool(-2))
+
+				if L.Get(-1).Type() != lua.LTNil {
+					action = action.WithPromptText(string(L.ToString(-1)))
+				}
+
+				go func() {
+					t.Run(L, action)
+				}()
+			}
+		}
+	})
+
+	return lt
 }
 
 func (t *Tab) Run(L *lua.LState, action ...chromedp.Action) {
@@ -114,6 +149,10 @@ func (t *Tab) Wait(L *lua.LState) {
 	t.Run(L, chromedp.WaitVisible(query, chromedp.ByQuery))
 }
 
+func (t *Tab) OnDialog(L *lua.LState) {
+	t.onDialog = L.CheckFunction(2)
+}
+
 func (t *Tab) Eval(L *lua.LState) int {
 	script := L.CheckString(2)
 
@@ -163,6 +202,7 @@ func RegisterTabType(ctx context.Context, L *lua.LState) {
 		"screenshot":  fn((*Tab).Screenshot),
 		"setViewport": fn((*Tab).SetViewport),
 		"wait":        fn((*Tab).Wait),
+		"onDialog":    fn((*Tab).OnDialog),
 		"all": L.NewFunction(func(L *lua.LState) int {
 			L.Push(NewElementsArray(L, CheckTab(L), L.CheckString(2)).ToLua(L))
 			return 1
@@ -180,10 +220,7 @@ func RegisterTabType(ctx context.Context, L *lua.LState) {
 
 	tab := L.SetFuncs(L.NewTypeMetatable("tab"), map[string]lua.LGFunction{
 		"new": func(L *lua.LState) int {
-			t := L.NewUserData()
-			t.Value = NewTab(ctx, L)
-			L.SetMetatable(t, L.GetTypeMetatable("tab"))
-			L.Push(t)
+			L.Push(NewTab(ctx, L).ToLua(L))
 			return 1
 		},
 		"__call": func(L *lua.LState) int {
