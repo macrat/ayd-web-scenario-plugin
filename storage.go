@@ -28,8 +28,12 @@ func NewStorage(basedir, scriptPath string, timestamp time.Time) (*Storage, erro
 	name = name[:len(name)-len(filepath.Ext(name))]
 	dir := filepath.Join(basedir, name, timestamp.Format("20060102T150405"))
 
-	if err := os.MkdirAll(dir, 0750); err != nil && errors.Is(err, os.ErrExist) {
-		return nil, err
+	if !filepath.IsAbs(dir) {
+		cwd, err := os.Getwd()
+		if err != nil {
+			return nil, err
+		}
+		dir = filepath.Join(cwd, dir)
 	}
 
 	return &Storage{
@@ -54,6 +58,9 @@ func (s *Storage) Save(name, ext string, data []byte) error {
 
 	s.Unlock()
 
+	if err := os.MkdirAll(filepath.Dir(p), 0750); err != nil && errors.Is(err, os.ErrExist) {
+		return err
+	}
 	return os.WriteFile(p, data, 0644)
 }
 
