@@ -28,14 +28,45 @@ func StartBrowser(ctx context.Context) (context.Context, context.CancelFunc) {
 	return ctx, cancel
 }
 
-func NewContext() (context.Context, context.CancelFunc) {
+func NewContext(debug bool) (context.Context, context.CancelFunc) {
+	opts := []chromedp.ExecAllocatorOption{
+		chromedp.NoFirstRun,
+		chromedp.NoDefaultBrowserCheck,
+
+		chromedp.Flag("disable-background-networking", true),
+		chromedp.Flag("enable-features", "NetworkService,NetworkServiceInProcess"),
+		chromedp.Flag("disable-background-timer-throttling", true),
+		chromedp.Flag("disable-backgrounding-occluded-windows", true),
+		chromedp.Flag("disable-breakpad", true),
+		chromedp.Flag("disable-client-side-phishing-detection", true),
+		chromedp.Flag("disable-default-apps", true),
+		chromedp.Flag("disable-dev-shm-usage", true),
+		chromedp.Flag("disable-extensions", true),
+		chromedp.Flag("disable-features", "site-per-process,Translate,BlinkGenPropertyTrees"),
+		chromedp.Flag("disable-hang-monitor", true),
+		chromedp.Flag("disable-ipc-flooding-protection", true),
+		chromedp.Flag("disable-popup-blocking", true),
+		chromedp.Flag("disable-prompt-on-repost", true),
+		chromedp.Flag("disable-renderer-backgrounding", true),
+		chromedp.Flag("disable-sync", true),
+		chromedp.Flag("force-color-profile", "srgb"),
+		chromedp.Flag("metrics-recording-only", true),
+		chromedp.Flag("safebrowsing-disable-auto-update", true),
+		chromedp.Flag("enable-automation", true),
+		chromedp.Flag("password-store", "basic"),
+		chromedp.Flag("use-mock-keychain", true),
+	}
+	if !debug {
+		opts = append(opts, chromedp.Headless)
+	}
+
 	ctx, cancel1 := context.WithTimeout(context.Background(), time.Hour)
-	//ctx, cancel2 := chromedp.NewExecAllocator(ctx, chromedp.NoFirstRun, chromedp.NoDefaultBrowserCheck)
+	ctx, cancel2 := chromedp.NewExecAllocator(ctx, opts...)
 	ctx, cancel3 := StartBrowser(ctx)
 
 	return ctx, func() {
 		cancel3()
-		//cancel2()
+		cancel2()
 		cancel1()
 	}
 }
@@ -55,7 +86,7 @@ func NewLuaState(ctx context.Context, logger *Logger, s *Storage) *lua.LState {
 func RunWebScenario(target *ayd.URL, debug bool) ayd.Record {
 	logger := &Logger{Debug: debug, Status: ayd.StatusHealthy}
 
-	ctx, cancel := NewContext()
+	ctx, cancel := NewContext(debug)
 	defer cancel()
 
 	baseDir := os.Getenv("WEBSCENARIO_ARTIFACT_DIR")
