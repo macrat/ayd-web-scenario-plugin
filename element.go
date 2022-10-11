@@ -84,12 +84,12 @@ func (e Element) SelectAll(L *lua.LState, query string) ElementsArray {
 }
 
 func (e Element) SendKeys(L *lua.LState) {
-	text := L.ToString(2)
+	text := L.CheckString(2)
 	e.tab.Run(L, chromedp.SendKeys(e.ids, text, chromedp.ByNodeID))
 }
 
 func (e Element) SetValue(L *lua.LState) {
-	value := L.ToString(2)
+	value := L.CheckString(2)
 	e.tab.Run(L, chromedp.SetValue(e.ids, value, chromedp.ByNodeID))
 }
 

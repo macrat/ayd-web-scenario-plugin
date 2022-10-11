@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -15,6 +16,7 @@ type Storage struct {
 	Dir       string
 	artifacts []string
 	guids     map[string]string
+	autoid    int
 }
 
 func NewStorage(basedir, scriptPath string, timestamp time.Time) (*Storage, error) {
@@ -37,13 +39,19 @@ func NewStorage(basedir, scriptPath string, timestamp time.Time) (*Storage, erro
 }
 
 func (s *Storage) Save(name, ext string, data []byte) error {
+	s.Lock()
+
+	if name == "" {
+		s.autoid += 1
+		name = fmt.Sprintf("%06d", s.autoid)
+	}
 	if !strings.HasSuffix(name, ext) {
 		name += ext
 	}
-	p := filepath.Join(s.Dir, name)
 
-	s.Lock()
+	p := filepath.Join(s.Dir, name)
 	s.artifacts = append(s.artifacts, p)
+
 	s.Unlock()
 
 	return os.WriteFile(p, data, 0644)
