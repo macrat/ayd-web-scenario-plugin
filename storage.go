@@ -61,13 +61,16 @@ func (s *Storage) CancelDownload(guid string) {
 	delete(s.guids, guid)
 }
 
-func (s *Storage) CompleteDownload(guid string) {
+func (s *Storage) CompleteDownload(guid string) string {
 	s.Lock()
 	defer s.Unlock()
 	if name, ok := s.guids[guid]; ok {
-		s.artifacts = append(s.artifacts, filepath.Join(s.Dir, name))
+		p := filepath.Join(s.Dir, name)
+		s.artifacts = append(s.artifacts, p)
 		delete(s.guids, guid)
+		return p
 	}
+	return ""
 }
 
 func (s *Storage) Artifacts() []string {

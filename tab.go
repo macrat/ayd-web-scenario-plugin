@@ -18,6 +18,7 @@ type Tab struct {
 
 	width, height int64
 	onDialog      *lua.LFunction
+	onDownloaded  *lua.LFunction
 }
 
 func NewTab(ctx context.Context, L *lua.LState, s *Storage) *Tab {
@@ -67,7 +68,13 @@ func (t *Tab) ToLua(L *lua.LState) *lua.LUserData {
 		case *browser.EventDownloadProgress:
 			switch e.State {
 			case browser.DownloadProgressStateCompleted:
-				t.storage.CompleteDownload(e.GUID)
+				filepath := t.storage.CompleteDownload(e.GUID)
+				if t.onDownloaded != nil {
+					L.Push(t.onDownloaded)
+					L.Push(lua.LString(filepath))
+					L.Push(lua.LNumber(e.TotalBytes))
+					L.Call(2, 0)
+				}
 			case browser.DownloadProgressStateCanceled:
 				t.storage.CancelDownload(e.GUID)
 			}
@@ -175,6 +182,10 @@ func (t *Tab) OnDialog(L *lua.LState) {
 	t.onDialog = L.CheckFunction(2)
 }
 
+func (t *Tab) OnDownloaded(L *lua.LState) {
+	t.onDownloaded = L.CheckFunction(2)
+}
+
 func (t *Tab) Eval(L *lua.LState) int {
 	script := L.CheckString(2)
 
@@ -216,15 +227,16 @@ func RegisterTabType(ctx context.Context, L *lua.LState, s *Storage) {
 	}
 
 	methods := map[string]*lua.LFunction{
-		"go":          fn((*Tab).Go),
-		"forward":     fn((*Tab).Forward),
-		"back":        fn((*Tab).Back),
-		"reload":      fn((*Tab).Reload),
-		"close":       fn((*Tab).Close),
-		"screenshot":  fn((*Tab).Screenshot),
-		"setViewport": fn((*Tab).SetViewport),
-		"wait":        fn((*Tab).Wait),
-		"onDialog":    fn((*Tab).OnDialog),
+		"go":           fn((*Tab).Go),
+		"forward":      fn((*Tab).Forward),
+		"back":         fn((*Tab).Back),
+		"reload":       fn((*Tab).Reload),
+		"close":        fn((*Tab).Close),
+		"screenshot":   fn((*Tab).Screenshot),
+		"setViewport":  fn((*Tab).SetViewport),
+		"wait":         fn((*Tab).Wait),
+		"onDialog":     fn((*Tab).OnDialog),
+		"onDownloaded": fn((*Tab).OnDownloaded),
 		"all": L.NewFunction(func(L *lua.LState) int {
 			L.Push(NewElementsArray(L, CheckTab(L), L.CheckString(2)).ToLua(L))
 			return 1

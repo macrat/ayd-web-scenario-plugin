@@ -1,5 +1,10 @@
 t = tab.new()
 
+t2 = tab.new(TEST.url())
+t2:onDialog(function(typ, msg, url)
+    error(string.format("caught unexpected dialog: %s %s %s", typ, msg, url))
+end)
+
 
 called = false
 t:onDialog(function(typ, msg, url)

@@ -104,10 +104,14 @@ func StartTestServer() *httptest.Server {
 	return httptest.NewServer(mux)
 }
 
-func RegisterTestUtil(L *lua.LState, server *httptest.Server) {
+func RegisterTestUtil(L *lua.LState, storage *Storage, server *httptest.Server) {
 	tbl := L.SetFuncs(L.NewTable(), map[string]lua.LGFunction{
 		"url": func(L *lua.LState) int {
 			L.Push(lua.LString(server.URL + L.OptString(1, "")))
+			return 1
+		},
+		"storage": func(L *lua.LState) int {
+			L.Push(lua.LString(filepath.Join(storage.Dir, L.OptString(1, ""))))
 			return 1
 		},
 	})
@@ -159,7 +163,7 @@ func Test_testSenarios(t *testing.T) {
 
 			logger := &Logger{Debug: true}
 			L := NewLuaState(ctx, logger, s)
-			RegisterTestUtil(L, server)
+			RegisterTestUtil(L, s, server)
 
 			if err := L.DoFile(p); err != nil {
 				t.Fatalf(err.Error())
