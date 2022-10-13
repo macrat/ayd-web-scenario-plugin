@@ -166,8 +166,6 @@ func (t *Tab) Screenshot(L *lua.LState) {
 func (t *Tab) SetViewport(L *lua.LState) {
 	w := L.CheckInt64(2)
 	h := L.CheckInt64(3)
-
-	// don't modify property of Tab before check both of arguments.
 	t.Run(L, chromedp.EmulateViewport(w, h))
 	t.width, t.height = w, h
 }

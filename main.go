@@ -12,57 +12,37 @@ import (
 	"github.com/yuin/gopher-lua"
 )
 
-func StartBrowser(ctx context.Context) (context.Context, context.CancelFunc) {
-	ctx, cancel := chromedp.NewContext(ctx,
-		chromedp.WithLogf(func(s string, args ...any) {
-			fmt.Printf("log"+s+"\n", args)
-		}),
-		//chromedp.WithDebugf(func(s string, args ...any) {
-		//	fmt.Printf("debug" + s + "\n", args)
-		//}),
-		chromedp.WithErrorf(func(s string, args ...any) {
-			fmt.Printf("error"+s+"\n", args)
-		}),
-	)
+func StartBrowser(ctx context.Context, debuglog *ayd.Logger) (context.Context, context.CancelFunc) {
+	var opts []chromedp.ContextOption
+	if debuglog != nil {
+		opts = append(
+			opts,
+			chromedp.WithLogf(func(s string, args ...any) {
+				debuglog.Healthy(fmt.Sprintf(s, args), map[string]any{
+					"level": "log",
+				})
+			}),
+			chromedp.WithDebugf(func(s string, args ...any) {
+				debuglog.Healthy(fmt.Sprintf(s, args), map[string]any{
+					"level": "debug",
+				})
+			}),
+			chromedp.WithErrorf(func(s string, args ...any) {
+				debuglog.Failure(fmt.Sprintf(s, args), map[string]any{
+					"level": "error",
+				})
+			}),
+		)
+	}
+	ctx, cancel := chromedp.NewContext(ctx, opts...)
 	chromedp.Run(ctx)
 	return ctx, cancel
 }
 
-func NewContext(debug bool) (context.Context, context.CancelFunc) {
-	opts := []chromedp.ExecAllocatorOption{
-		chromedp.NoFirstRun,
-		chromedp.NoDefaultBrowserCheck,
-
-		chromedp.Flag("disable-background-networking", true),
-		chromedp.Flag("enable-features", "NetworkService,NetworkServiceInProcess"),
-		chromedp.Flag("disable-background-timer-throttling", true),
-		chromedp.Flag("disable-backgrounding-occluded-windows", true),
-		chromedp.Flag("disable-breakpad", true),
-		chromedp.Flag("disable-client-side-phishing-detection", true),
-		chromedp.Flag("disable-default-apps", true),
-		chromedp.Flag("disable-dev-shm-usage", true),
-		chromedp.Flag("disable-extensions", true),
-		chromedp.Flag("disable-features", "site-per-process,Translate,BlinkGenPropertyTrees"),
-		chromedp.Flag("disable-hang-monitor", true),
-		chromedp.Flag("disable-ipc-flooding-protection", true),
-		chromedp.Flag("disable-popup-blocking", true),
-		chromedp.Flag("disable-prompt-on-repost", true),
-		chromedp.Flag("disable-renderer-backgrounding", true),
-		chromedp.Flag("disable-sync", true),
-		chromedp.Flag("force-color-profile", "srgb"),
-		chromedp.Flag("metrics-recording-only", true),
-		chromedp.Flag("safebrowsing-disable-auto-update", true),
-		chromedp.Flag("enable-automation", true),
-		chromedp.Flag("password-store", "basic"),
-		chromedp.Flag("use-mock-keychain", true),
-	}
-	if !debug {
-		opts = append(opts, chromedp.Headless)
-	}
-
+func NewContext(debuglog *ayd.Logger) (context.Context, context.CancelFunc) {
 	ctx, cancel1 := context.WithTimeout(context.Background(), time.Hour)
-	ctx, cancel2 := chromedp.NewExecAllocator(ctx, opts...)
-	ctx, cancel3 := StartBrowser(ctx)
+	ctx, cancel2 := chromedp.NewExecAllocator(ctx, chromedp.DefaultExecAllocatorOptions[:]...)
+	ctx, cancel3 := StartBrowser(ctx, debuglog)
 
 	return ctx, func() {
 		cancel3()
@@ -84,25 +64,41 @@ func NewLuaState(ctx context.Context, logger *Logger, s *Storage) *lua.LState {
 }
 
 func RunWebScenario(target *ayd.URL, debug bool) ayd.Record {
+	timestamp := time.Now()
+
 	logger := &Logger{Debug: debug, Status: ayd.StatusHealthy}
 
-	ctx, cancel := NewContext(debug)
-	defer cancel()
-
 	baseDir := os.Getenv("WEBSCENARIO_ARTIFACT_DIR")
-
-	stime := time.Now()
-
-	storage, err := NewStorage(baseDir, target.Opaque, stime)
+	storage, err := NewStorage(baseDir, target.Opaque, timestamp)
 	if err != nil {
 		return ayd.Record{
+			Time:    timestamp,
 			Status:  ayd.StatusFailure,
 			Message: err.Error(),
 		}
 	}
+
+	var browserlog *ayd.Logger
+	if debug {
+		f, err := storage.Open("browser.log")
+		if err != nil {
+			return ayd.Record{
+				Time:    timestamp,
+				Status:  ayd.StatusFailure,
+				Message: err.Error(),
+			}
+		}
+		defer f.Close()
+		l := ayd.NewLoggerWithWriter(f, target)
+		browserlog = &l
+	}
+	ctx, cancel := NewContext(browserlog)
+	defer cancel()
+
 	L := NewLuaState(ctx, logger, storage)
 	defer L.Close()
 
+	stime := time.Now()
 	err = L.DoFile(target.Opaque)
 	latency := time.Since(stime)
 
@@ -122,7 +118,7 @@ func RunWebScenario(target *ayd.URL, debug bool) ayd.Record {
 	}
 
 	r := logger.AsRecord()
-	r.Time = stime
+	r.Time = timestamp
 	r.Latency = latency
 	return r
 }

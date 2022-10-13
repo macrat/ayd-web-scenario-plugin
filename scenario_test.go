@@ -144,7 +144,7 @@ func Test_testSenarios(t *testing.T) {
 	server := StartTestServer()
 	defer server.Close()
 
-	ctx, cancel := NewContext(false)
+	ctx, cancel := NewContext(nil)
 	defer cancel()
 
 	ctx, cancel = context.WithTimeout(ctx, 1*time.Minute)

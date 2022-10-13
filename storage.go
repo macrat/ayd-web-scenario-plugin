@@ -42,6 +42,19 @@ func NewStorage(basedir, scriptPath string, timestamp time.Time) (*Storage, erro
 	}, nil
 }
 
+func (s *Storage) Open(name string) (*os.File, error) {
+	p := filepath.Join(s.Dir, name)
+
+	s.Lock()
+	s.artifacts = append(s.artifacts, p)
+	s.Unlock()
+
+	if err := os.MkdirAll(filepath.Dir(p), 0750); err != nil && errors.Is(err, os.ErrExist) {
+		return nil, err
+	}
+	return os.OpenFile(p, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0640)
+}
+
 func (s *Storage) Save(name, ext string, data []byte) error {
 	s.Lock()
 
