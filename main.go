@@ -9,7 +9,13 @@ import (
 
 	"github.com/chromedp/chromedp"
 	"github.com/macrat/ayd/lib-ayd"
+	"github.com/spf13/pflag"
 	"github.com/yuin/gopher-lua"
+)
+
+var (
+	Version = "HEAD"
+	Commit  = "UNKNOWN"
 )
 
 func StartBrowser(ctx context.Context, debuglog *ayd.Logger) (context.Context, context.CancelFunc) {
@@ -124,13 +130,33 @@ func RunWebScenario(target *ayd.URL, debug bool) ayd.Record {
 }
 
 func main() {
-	args, err := ayd.ParseProbePluginArgs()
-	if err != nil {
-		fmt.Fprintln(os.Stderr, "$ ayd-web-script-probe TARGERT_URL")
+	flags := pflag.NewFlagSet("ayd-web-scenario-plugin", pflag.ContinueOnError)
+	debugMode := flags.Bool("debug", false, "enable debug mode.")
+	showVersion := flags.BoolP("version", "v", false, "show version and exit.")
+	showHelp := flags.BoolP("help", "h", false, "show help message and exit.")
+
+	if err := flags.Parse(os.Args[1:]); err != nil {
 		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		fmt.Fprintf(os.Stderr, "\nPlease see `%s -h` for more information.\n", os.Args[0])
+		os.Exit(2)
+	}
+	switch {
+	case *showVersion:
+		fmt.Printf("Ayd WebScenaro plugin %s (%s)\n", Version, Commit)
+		return
+	case *showHelp || len(flags.Args()) != 1:
+		fmt.Println("$ ayd-web-scenario-plugin [OPTIONS] TARGET_URL\n\nOptions:")
+		flags.PrintDefaults()
+		return
 	}
 
-	r := RunWebScenario(args.TargetURL, true)
-	ayd.NewLogger(args.TargetURL).Print(r)
+	target, err := ayd.ParseURL(flags.Arg(0))
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		fmt.Fprintf(os.Stderr, "\nPlease see `%s -h` for more information.\n", os.Args[0])
+		os.Exit(2)
+	}
+
+	r := RunWebScenario(target, *debugMode)
+	ayd.NewLogger(target).Print(r)
 }
