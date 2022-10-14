@@ -9,6 +9,7 @@ require (
 	github.com/macrat/ayd v0.15.0
 	github.com/spf13/pflag v1.0.5
 	github.com/yuin/gopher-lua v0.0.0-20220504180219-658193537a64
+	golang.org/x/image v0.0.0-20220902085622-e7cb96979f69
 )
 
 require (
@@ -19,4 +20,5 @@ require (
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
 	golang.org/x/sys v0.0.0-20220928140112-f11e5e49a4ec // indirect
+	golang.org/x/text v0.3.7 // indirect
 )
