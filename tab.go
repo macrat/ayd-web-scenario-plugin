@@ -45,7 +45,7 @@ func NewTab(ctx context.Context, L *lua.LState, s *Storage) *Tab {
 
 	if L.GetTop() > 0 {
 		url := L.CheckString(1)
-		t.Run(L, fmt.Sprintf("$:goto(%q)", url), chromedp.Navigate(url))
+		t.Run(L, fmt.Sprintf("$:go(%q)", url), chromedp.Navigate(url))
 	}
 
 	return t
