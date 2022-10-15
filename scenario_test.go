@@ -147,7 +147,7 @@ func Test_testSenarios(t *testing.T) {
 	ctx, cancel := NewContext(nil)
 	defer cancel()
 
-	ctx, cancel = context.WithTimeout(ctx, 1*time.Minute)
+	ctx, cancel = context.WithTimeout(ctx, 5*time.Minute)
 	defer cancel()
 
 	for _, p := range files {
