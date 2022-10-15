@@ -106,7 +106,11 @@ func TestRunWebScenario(t *testing.T) {
 			t.Setenv("TEST_EXTRA", tt.Extra)
 			t.Setenv("TEST_ERROR", tt.Error)
 
-			r := RunWebScenario(&ayd.URL{Scheme: "web-scenario", Opaque: "./testdata/_main-test.lua"}, false, false)
+			var r ayd.Record
+
+			RunWebScenario(&ayd.URL{Scheme: "web-scenario", Opaque: "./testdata/_main-test.lua"}, false, false, func(rec ayd.Record) {
+				r = rec
+			})
 
 			if r.Latency == 0 {
 				t.Errorf("latency should not be 0")

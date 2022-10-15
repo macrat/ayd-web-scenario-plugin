@@ -36,7 +36,7 @@ func NewTab(ctx context.Context, env *Environment) *Tab {
 
 	if env.EnableRecording {
 		var err error
-		t.recorder, err = NewRecorder()
+		t.recorder, err = NewRecorder(ctx)
 		if err != nil {
 			env.L.RaiseError("%s", err)
 		}
@@ -191,15 +191,15 @@ func (t *Tab) Reload(L *lua.LState) {
 func (t *Tab) Close(L *lua.LState) {
 	if t.recorder != nil {
 		t.RecordOnce(L, "$:close()", false)
-		if f, err := t.env.storage.Open("record.gif"); err == nil {
-			defer f.Close()
-			t.recorder.SaveTo(f)
-		}
 	}
 
 	t.env.unregisterTab(t)
 
 	t.cancel()
+
+	if t.recorder != nil {
+		t.env.saveRecord(t.recorder)
+	}
 }
 
 func (t *Tab) Screenshot(L *lua.LState) {

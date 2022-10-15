@@ -57,7 +57,7 @@ func NewContext(debuglog *ayd.Logger) (context.Context, context.CancelFunc) {
 	}
 }
 
-func RunWebScenario(target *ayd.URL, debug bool, enableRecording bool) ayd.Record {
+func RunWebScenario(target *ayd.URL, debug bool, enableRecording bool, callback func(ayd.Record)) {
 	timestamp := time.Now()
 
 	logger := &Logger{Debug: debug, Status: ayd.StatusHealthy}
@@ -65,22 +65,24 @@ func RunWebScenario(target *ayd.URL, debug bool, enableRecording bool) ayd.Recor
 	baseDir := os.Getenv("WEBSCENARIO_ARTIFACT_DIR")
 	storage, err := NewStorage(baseDir, target.Opaque, timestamp)
 	if err != nil {
-		return ayd.Record{
+		callback(ayd.Record{
 			Time:    timestamp,
 			Status:  ayd.StatusFailure,
 			Message: err.Error(),
-		}
+		})
+		return
 	}
 
 	var browserlog *ayd.Logger
 	if debug {
 		f, err := storage.Open("browser.log")
 		if err != nil {
-			return ayd.Record{
+			callback(ayd.Record{
 				Time:    timestamp,
 				Status:  ayd.StatusFailure,
 				Message: err.Error(),
-			}
+			})
+			return
 		}
 		defer f.Close()
 		l := ayd.NewLoggerWithWriter(f, target)
@@ -116,7 +118,7 @@ func RunWebScenario(target *ayd.URL, debug bool, enableRecording bool) ayd.Recor
 	r := logger.AsRecord()
 	r.Time = timestamp
 	r.Latency = latency
-	return r
+	callback(r)
 }
 
 func ParseTargetURL(s string) (*ayd.URL, error) {
@@ -164,6 +166,7 @@ func main() {
 		os.Exit(2)
 	}
 
-	r := RunWebScenario(target, *debugMode, *enableRecording)
-	ayd.NewLogger(target).Print(r)
+	RunWebScenario(target, *debugMode, *enableRecording, func(r ayd.Record) {
+		ayd.NewLogger(target).Print(r)
+	})
 }
