@@ -119,6 +119,22 @@ func RunWebScenario(target *ayd.URL, debug bool, enableRecording bool) ayd.Recor
 	return r
 }
 
+func ParseTargetURL(s string) (*ayd.URL, error) {
+	u, err := ayd.ParseURL(s)
+	if err != nil {
+		return nil, err
+	}
+	if u.Scheme == "" {
+		u.Scheme = "web-scenario"
+	}
+	if u.Opaque == "" {
+		u.Opaque = u.Path
+		u.Path = ""
+	}
+	u.Host = ""
+	return u, nil
+}
+
 func main() {
 	flags := pflag.NewFlagSet("ayd-web-scenario-plugin", pflag.ContinueOnError)
 	debugMode := flags.Bool("debug", false, "enable debug mode.")
@@ -141,7 +157,7 @@ func main() {
 		return
 	}
 
-	target, err := ayd.ParseURL(flags.Arg(0))
+	target, err := ParseTargetURL(flags.Arg(0))
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		fmt.Fprintf(os.Stderr, "\nPlease see `%s -h` for more information.\n", os.Args[0])
