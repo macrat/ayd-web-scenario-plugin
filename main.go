@@ -57,19 +57,7 @@ func NewContext(debuglog *ayd.Logger) (context.Context, context.CancelFunc) {
 	}
 }
 
-func NewLuaState(ctx context.Context, logger *Logger, s *Storage) *lua.LState {
-	L := lua.NewState()
-
-	RegisterLogger(L, logger)
-	RegisterElementsArrayType(ctx, L)
-	RegisterElementType(ctx, L)
-	RegisterTabType(ctx, L, s)
-	RegisterTime(L)
-
-	return L
-}
-
-func RunWebScenario(target *ayd.URL, debug bool) ayd.Record {
+func RunWebScenario(target *ayd.URL, debug bool, enableRecording bool) ayd.Record {
 	timestamp := time.Now()
 
 	logger := &Logger{Debug: debug, Status: ayd.StatusHealthy}
@@ -101,11 +89,13 @@ func RunWebScenario(target *ayd.URL, debug bool) ayd.Record {
 	ctx, cancel := NewContext(browserlog)
 	defer cancel()
 
-	L := NewLuaState(ctx, logger, storage)
-	defer L.Close()
+	env := NewEnvironment(ctx, logger, storage)
+	defer env.Close()
+
+	env.EnableRecording = enableRecording
 
 	stime := time.Now()
-	err = L.DoFile(target.Opaque)
+	err = env.L.DoFile(target.Opaque)
 	latency := time.Since(stime)
 
 	if err != nil {
@@ -132,6 +122,7 @@ func RunWebScenario(target *ayd.URL, debug bool) ayd.Record {
 func main() {
 	flags := pflag.NewFlagSet("ayd-web-scenario-plugin", pflag.ContinueOnError)
 	debugMode := flags.Bool("debug", false, "enable debug mode.")
+	enableRecording := flags.Bool("gif", false, "enable recording animation gif.")
 	showVersion := flags.BoolP("version", "v", false, "show version and exit.")
 	showHelp := flags.BoolP("help", "h", false, "show help message and exit.")
 
@@ -157,6 +148,6 @@ func main() {
 		os.Exit(2)
 	}
 
-	r := RunWebScenario(target, *debugMode)
+	r := RunWebScenario(target, *debugMode, *enableRecording)
 	ayd.NewLogger(target).Print(r)
 }

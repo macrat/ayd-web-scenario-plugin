@@ -13,9 +13,9 @@ import (
 )
 
 type Tab struct {
-	ctx     context.Context
-	cancel  context.CancelFunc
-	storage *Storage
+	ctx    context.Context
+	cancel context.CancelFunc
+	env    *Environment
 
 	width, height int64
 	onDialog      *lua.LFunction
@@ -24,28 +24,34 @@ type Tab struct {
 	recorder *Recorder
 }
 
-func NewTab(ctx context.Context, L *lua.LState, s *Storage) *Tab {
+func NewTab(ctx context.Context, env *Environment) *Tab {
 	ctx, cancel := chromedp.NewContext(ctx)
 	t := &Tab{
-		ctx:     ctx,
-		cancel:  cancel,
-		storage: s,
-		width:   1280,
-		height:  720,
+		ctx:    ctx,
+		cancel: cancel,
+		env:    env,
+		width:  1280,
+		height: 720,
 	}
 
-	t.recorder, _ = NewRecorder()
+	if env.EnableRecording {
+		var err error
+		t.recorder, err = NewRecorder()
+		if err != nil {
+			env.L.RaiseError("%s", err)
+		}
+	}
 
 	t.Run(
-		L,
+		env.L,
 		"",
-		browser.SetDownloadBehavior(browser.SetDownloadBehaviorBehaviorAllow).WithDownloadPath(s.Dir).WithEventsEnabled(true),
+		browser.SetDownloadBehavior(browser.SetDownloadBehaviorBehaviorAllow).WithDownloadPath(env.storage.Dir).WithEventsEnabled(true),
 		chromedp.EmulateViewport(t.width, t.height),
 	)
 
-	if L.GetTop() > 0 {
-		url := L.CheckString(1)
-		t.Run(L, fmt.Sprintf("$:go(%q)", url), chromedp.Navigate(url))
+	if env.L.GetTop() > 0 {
+		url := env.L.CheckString(1)
+		t.Run(env.L, fmt.Sprintf("$:go(%q)", url), chromedp.Navigate(url))
 	}
 
 	return t
@@ -70,11 +76,11 @@ func (t *Tab) ToLua(L *lua.LState) *lua.LUserData {
 	chromedp.ListenTarget(t.ctx, func(ev any) {
 		switch e := ev.(type) {
 		case *browser.EventDownloadWillBegin:
-			t.storage.StartDownload(e.GUID, e.SuggestedFilename)
+			t.env.storage.StartDownload(e.GUID, e.SuggestedFilename)
 		case *browser.EventDownloadProgress:
 			switch e.State {
 			case browser.DownloadProgressStateCompleted:
-				filepath := t.storage.CompleteDownload(e.GUID)
+				filepath := t.env.storage.CompleteDownload(e.GUID)
 				if t.onDownloaded != nil {
 					L.Push(t.onDownloaded)
 					L.Push(lua.LString(filepath))
@@ -82,7 +88,7 @@ func (t *Tab) ToLua(L *lua.LState) *lua.LUserData {
 					L.Call(2, 0)
 				}
 			case browser.DownloadProgressStateCanceled:
-				t.storage.CancelDownload(e.GUID)
+				t.env.storage.CancelDownload(e.GUID)
 			}
 		case *page.EventJavascriptDialogOpening:
 			if t.onDialog == nil {
@@ -145,7 +151,7 @@ func (t *Tab) Run(L *lua.LState, taskName string, action ...chromedp.Action) {
 }
 
 func (t *Tab) Save(L *lua.LState, name, ext string, data []byte) {
-	err := t.storage.Save(name, ext, data)
+	err := t.env.storage.Save(name, ext, data)
 	if err != nil {
 		L.RaiseError("%s", err)
 	}
@@ -183,11 +189,15 @@ func (t *Tab) Reload(L *lua.LState) {
 }
 
 func (t *Tab) Close(L *lua.LState) {
-	t.RecordOnce(L, "$:close()", false)
-	if f, err := t.storage.Open("record.gif"); err == nil {
-		defer f.Close()
-		t.recorder.SaveTo(f)
+	if t.recorder != nil {
+		t.RecordOnce(L, "$:close()", false)
+		if f, err := t.env.storage.Open("record.gif"); err == nil {
+			defer f.Close()
+			t.recorder.SaveTo(f)
+		}
 	}
+
+	t.env.unregisterTab(t)
 
 	t.cancel()
 }
@@ -253,9 +263,9 @@ func (t *Tab) GetViewport(L *lua.LState) int {
 	return 1
 }
 
-func RegisterTabType(ctx context.Context, L *lua.LState, s *Storage) {
+func RegisterTabType(ctx context.Context, env *Environment) {
 	fn := func(f func(*Tab, *lua.LState)) *lua.LFunction {
-		return L.NewFunction(func(L *lua.LState) int {
+		return env.L.NewFunction(func(L *lua.LState) int {
 			f(CheckTab(L), L)
 			L.Push(L.Get(1))
 			return 1
@@ -273,11 +283,11 @@ func RegisterTabType(ctx context.Context, L *lua.LState, s *Storage) {
 		"wait":         fn((*Tab).Wait),
 		"onDialog":     fn((*Tab).OnDialog),
 		"onDownloaded": fn((*Tab).OnDownloaded),
-		"all": L.NewFunction(func(L *lua.LState) int {
+		"all": env.L.NewFunction(func(L *lua.LState) int {
 			L.Push(NewElementsArray(L, CheckTab(L), L.CheckString(2)).ToLua(L))
 			return 1
 		}),
-		"eval": L.NewFunction(func(L *lua.LState) int {
+		"eval": env.L.NewFunction(func(L *lua.LState) int {
 			return CheckTab(L).Eval(L)
 		}),
 	}
@@ -288,9 +298,11 @@ func RegisterTabType(ctx context.Context, L *lua.LState, s *Storage) {
 		"viewport": (*Tab).GetViewport,
 	}
 
-	tab := L.SetFuncs(L.NewTypeMetatable("tab"), map[string]lua.LGFunction{
+	tab := env.L.SetFuncs(env.L.NewTypeMetatable("tab"), map[string]lua.LGFunction{
 		"new": func(L *lua.LState) int {
-			L.Push(NewTab(ctx, L, s).ToLua(L))
+			t := NewTab(ctx, env)
+			env.registerTab(t)
+			L.Push(t.ToLua(L))
 			return 1
 		},
 		"__call": func(L *lua.LState) int {
@@ -318,5 +330,5 @@ func RegisterTabType(ctx context.Context, L *lua.LState, s *Storage) {
 		},
 	})
 
-	L.SetGlobal("tab", tab)
+	env.L.SetGlobal("tab", tab)
 }

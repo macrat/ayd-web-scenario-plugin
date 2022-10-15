@@ -162,10 +162,12 @@ func Test_testSenarios(t *testing.T) {
 			}
 
 			logger := &Logger{Debug: true}
-			L := NewLuaState(ctx, logger, s)
-			RegisterTestUtil(L, s, server)
+			env := NewEnvironment(ctx, logger, s)
+			defer env.Close()
 
-			if err := L.DoFile(p); err != nil {
+			RegisterTestUtil(env.L, s, server)
+
+			if err := env.L.DoFile(p); err != nil {
 				t.Fatalf(err.Error())
 			}
 		})
