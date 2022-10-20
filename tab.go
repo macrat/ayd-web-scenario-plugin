@@ -100,21 +100,22 @@ func (t *Tab) ToLua(L *lua.LState) *lua.LUserData {
 			if t.onDialog == nil {
 				page.HandleJavaScriptDialog(true)
 			} else {
-				L.Push(t.onDialog)
-				L.Push(lua.LString(e.Type))
-				L.Push(lua.LString(e.Message))
-				L.Push(lua.LString(e.URL))
-				L.Call(3, 2)
+				thread, cancel := L.NewThread()
+				go func(L *lua.LState, cancel context.CancelFunc) {
+					defer cancel()
+					L.Push(t.onDialog)
+					L.Push(lua.LString(e.Type))
+					L.Push(lua.LString(e.Message))
+					L.Push(lua.LString(e.URL))
+					L.Call(3, 2)
 
-				action := page.HandleJavaScriptDialog(L.ToBool(-2))
+					action := page.HandleJavaScriptDialog(L.ToBool(-2))
 
-				if L.Get(-1).Type() != lua.LTNil {
-					action = action.WithPromptText(string(L.ToString(-1)))
-				}
-
-				go func() {
+					if L.Get(-1).Type() != lua.LTNil {
+						action = action.WithPromptText(string(L.ToString(-1)))
+					}
 					t.Run(L, "", action)
-				}()
+				}(thread, cancel)
 			}
 		}
 	})

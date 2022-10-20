@@ -21,6 +21,7 @@ type Environment struct {
 
 func NewEnvironment(ctx context.Context, logger *Logger, s *Storage) *Environment {
 	L := lua.NewState()
+	L.SetContext(ctx)
 
 	env := &Environment{
 		L:       L,
