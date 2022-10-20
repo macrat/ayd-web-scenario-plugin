@@ -12,21 +12,14 @@ import (
 	"github.com/yuin/gopher-lua"
 )
 
-type DownloadedEvent struct {
-	Path  string
-	Bytes float64
-}
-
 type Tab struct {
 	ctx    context.Context
 	cancel context.CancelFunc
 	env    *Environment
 
 	width, height int64
-
-	downloadedQueue chan DownloadedEvent
-
-	onDialog *lua.LFunction
+	onDialog      *lua.LFunction
+	onDownloaded  *lua.LFunction
 
 	recorder *Recorder
 }
@@ -39,8 +32,6 @@ func NewTab(ctx context.Context, env *Environment) *Tab {
 		env:    env,
 		width:  1280,
 		height: 720,
-
-		downloadedQueue: make(chan DownloadedEvent, 10000),
 	}
 
 	if env.EnableRecording {
@@ -89,9 +80,12 @@ func (t *Tab) ToLua(L *lua.LState) *lua.LUserData {
 		case *browser.EventDownloadProgress:
 			switch e.State {
 			case browser.DownloadProgressStateCompleted:
-				t.downloadedQueue <- DownloadedEvent{
-					Path:  t.env.storage.CompleteDownload(e.GUID),
-					Bytes: e.TotalBytes,
+				filepath := t.env.storage.CompleteDownload(e.GUID)
+				if t.onDownloaded != nil {
+					L.Push(t.onDownloaded)
+					L.Push(lua.LString(filepath))
+					L.Push(lua.LNumber(e.TotalBytes))
+					L.Call(2, 0)
 				}
 			case browser.DownloadProgressStateCanceled:
 				t.env.storage.CancelDownload(e.GUID)
@@ -231,30 +225,12 @@ func (t *Tab) Wait(L *lua.LState) {
 	t.Run(L, fmt.Sprintf("$:wait(%q)", query), chromedp.WaitVisible(query, chromedp.ByQuery))
 }
 
-func (t *Tab) WaitDownload(L *lua.LState) int {
-	timeout := 60.0 * 1000.0
-	if L.GetTop() >= 2 {
-		timeout = float64(L.CheckNumber(2))
-	}
-
-	ctx, cancel := context.WithTimeout(t.ctx, time.Duration(timeout*float64(time.Millisecond)))
-	defer cancel()
-
-	select {
-	case ev := <-t.downloadedQueue:
-		tbl := L.NewTable()
-		L.SetField(tbl, "path", lua.LString(ev.Path))
-		L.SetField(tbl, "bytes", lua.LNumber(ev.Bytes))
-		L.Push(tbl)
-		return 1
-	case <-ctx.Done():
-		L.RaiseError("timeout")
-		return 0
-	}
-}
-
 func (t *Tab) OnDialog(L *lua.LState) {
 	t.onDialog = L.CheckFunction(2)
+}
+
+func (t *Tab) OnDownloaded(L *lua.LState) {
+	t.onDownloaded = L.CheckFunction(2)
 }
 
 func (t *Tab) Eval(L *lua.LState) int {
@@ -297,12 +273,6 @@ func RegisterTabType(ctx context.Context, env *Environment) {
 		})
 	}
 
-	fget := func(f func(*Tab, *lua.LState) int) *lua.LFunction {
-		return env.L.NewFunction(func(L *lua.LState) int {
-			return f(CheckTab(L), L)
-		})
-	}
-
 	methods := map[string]*lua.LFunction{
 		"go":           fn((*Tab).Go),
 		"forward":      fn((*Tab).Forward),
@@ -312,12 +282,14 @@ func RegisterTabType(ctx context.Context, env *Environment) {
 		"screenshot":   fn((*Tab).Screenshot),
 		"setViewport":  fn((*Tab).SetViewport),
 		"wait":         fn((*Tab).Wait),
-		"waitDownload": fget((*Tab).WaitDownload),
 		"onDialog":     fn((*Tab).OnDialog),
-		"eval":         fget((*Tab).Eval),
+		"onDownloaded": fn((*Tab).OnDownloaded),
 		"all": env.L.NewFunction(func(L *lua.LState) int {
 			L.Push(NewElementsArray(L, CheckTab(L), L.CheckString(2)).ToLua(L))
 			return 1
+		}),
+		"eval": env.L.NewFunction(func(L *lua.LState) int {
+			return CheckTab(L).Eval(L)
 		}),
 	}
 

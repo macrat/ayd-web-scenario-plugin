@@ -95,17 +95,6 @@ The web scinario script is based on lua 5.1 ([GopherLua](https://github.com/yuin
 
   e.g. `t:eval([[ document.querySelector("#something").style.borderColor ]])`
 
-### download file
-
-- `tab:waitDownload([timeout])`
-
-  Wait until a file downloaded.
-
-  `timeout` is the timeout duration in millisecond.
-  In default, this function waits 60 seconds and raise an error.
-
-  The result is a table which contains `path` to downloaded file, and `bytes` of downloaded file size.
-
 ### settings
 
 - `tab.viewport` / `tab:setViewport(width, height)`
@@ -124,6 +113,16 @@ The web scinario script is based on lua 5.1 ([GopherLua](https://github.com/yuin
   You can return two values from the callback function, `accept` and `text`.
   * If `accept` is true or absent, it will click on `"OK"`. Otherwise it will click on `"cancel"` or something.
   * `text` value will used for the prompt input value, if the dialog type was `"prompt"`.
+
+  __NOTE__: It disables the previous callback function when called.
+
+- `tab:onDownloaded(callback)`
+
+  Set a callback function that will called when file downloaded from the tab.
+
+  The callback function has two arguments, `filepath` and `bytes`.
+  * `filepath` is the path to downloaded file.
+  * `bytes` is downloaded file size in bytes.
 
   __NOTE__: It disables the previous callback function when called.
 
