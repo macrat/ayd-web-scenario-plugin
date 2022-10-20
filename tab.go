@@ -82,10 +82,13 @@ func (t *Tab) ToLua(L *lua.LState) *lua.LUserData {
 			case browser.DownloadProgressStateCompleted:
 				filepath := t.env.storage.CompleteDownload(e.GUID)
 				if t.onDownloaded != nil {
-					L.Push(t.onDownloaded)
-					L.Push(lua.LString(filepath))
-					L.Push(lua.LNumber(e.TotalBytes))
-					L.Call(2, 0)
+					go func(L *lua.LState, cancel context.CancelFunc) {
+						L.Push(t.onDownloaded)
+						L.Push(lua.LString(filepath))
+						L.Push(lua.LNumber(e.TotalBytes))
+						L.Call(2, 0)
+						cancel()
+					}(L.NewThread())
 				}
 			case browser.DownloadProgressStateCanceled:
 				t.env.storage.CancelDownload(e.GUID)
@@ -94,9 +97,7 @@ func (t *Tab) ToLua(L *lua.LState) *lua.LUserData {
 			if t.onDialog == nil {
 				page.HandleJavaScriptDialog(true)
 			} else {
-				thread, cancel := L.NewThread()
 				go func(L *lua.LState, cancel context.CancelFunc) {
-					defer cancel()
 					L.Push(t.onDialog)
 					L.Push(lua.LString(e.Type))
 					L.Push(lua.LString(e.Message))
@@ -109,7 +110,9 @@ func (t *Tab) ToLua(L *lua.LState) *lua.LUserData {
 						action = action.WithPromptText(string(L.ToString(-1)))
 					}
 					t.Run(L, "", action)
-				}(thread, cancel)
+
+					cancel()
+				}(L.NewThread())
 			}
 		}
 	})
