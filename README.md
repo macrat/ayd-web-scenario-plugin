@@ -104,6 +104,8 @@ The web scinario script is based on lua 5.1 ([GopherLua](https://github.com/yuin
 - `tab:onDialog(callback)`
 
   Set a callback function that will called when dialog opened in the tab.
+  You can set `nil` as a callback to disable callback.
+  When the callback not set, the browser clicks OK button for all dialogs.
 
   The callback function takes a table as argument, it contains `type`, `message`, and `url`.
   * `type` means dialog type, one of `"alert"`, `"confirm"`, `"prompt"`, and `"beforeunload"`.
@@ -114,17 +116,18 @@ The web scinario script is based on lua 5.1 ([GopherLua](https://github.com/yuin
   * If `accept` is true or absent, it will click on `"OK"`. Otherwise it will click on `"cancel"` or something.
   * `text` value will used for the prompt input value, if the dialog type was `"prompt"`.
 
-  __NOTE__: It disables the previous callback function when called.
+  __NOTE__: The previous callback function will be disabled when `onDialog()` called.
 
 - `tab:onDownloaded(callback)`
 
   Set a callback function that will called when file downloaded from the tab.
+  You can set `nil` as a callback to disable callback.
 
   The callback function takes a table as argument, it contains `filepath` and `bytes`.
   * `filepath` is the path to downloaded file.
   * `bytes` is downloaded file size in bytes.
 
-  __NOTE__: It disables the previous callback function when called.
+  __NOTE__: The previous callback function will be disabled when `onDownloaded()` called.
 
 
 ## element / elementsarray

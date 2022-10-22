@@ -27,13 +27,18 @@ type Tab struct {
 func NewTab(ctx context.Context, env *Environment, url string) *Tab {
 	t := AsyncRun(env, func() *Tab {
 		ctx, cancel := chromedp.NewContext(ctx)
-		return &Tab{
+		t := &Tab{
 			ctx:    ctx,
 			cancel: cancel,
 			env:    env,
 			width:  1280,
 			height: 720,
 		}
+		t.runInCallback(
+			browser.SetDownloadBehavior(browser.SetDownloadBehaviorBehaviorAllow).WithDownloadPath(env.storage.Dir).WithEventsEnabled(true),
+			chromedp.EmulateViewport(t.width, t.height),
+		)
+		return t
 	})
 
 	if env.EnableRecording {
@@ -43,12 +48,6 @@ func NewTab(ctx context.Context, env *Environment, url string) *Tab {
 			env.RaiseError("%s", err)
 		}
 	}
-
-	t.Run(
-		"",
-		browser.SetDownloadBehavior(browser.SetDownloadBehaviorBehaviorAllow).WithDownloadPath(env.storage.Dir).WithEventsEnabled(true),
-		chromedp.EmulateViewport(t.width, t.height),
-	)
 
 	if url != "" {
 		t.Run(fmt.Sprintf("$:go(%q)", url), chromedp.Navigate(url))
@@ -87,7 +86,7 @@ func (t *Tab) ToLua(L *lua.LState) *lua.LUserData {
 						t.onDownloaded,
 						map[string]lua.LValue{
 							"filepath": lua.LString(filepath),
-							"bytes": lua.LNumber(e.TotalBytes),
+							"bytes":    lua.LNumber(e.TotalBytes),
 						},
 						0,
 					)
@@ -97,15 +96,17 @@ func (t *Tab) ToLua(L *lua.LState) *lua.LUserData {
 			}
 		case *page.EventJavascriptDialogOpening:
 			if t.onDialog == nil {
-				page.HandleJavaScriptDialog(true)
+				go func() {
+					t.runInCallback(page.HandleJavaScriptDialog(true))
+				}()
 			} else {
 				go func() {
 					result := t.env.CallEventHandler(
 						t.onDialog,
 						map[string]lua.LValue{
-							"type": lua.LString(e.Type),
+							"type":    lua.LString(e.Type),
 							"message": lua.LString(e.Message),
-							"url": lua.LString(e.URL),
+							"url":     lua.LString(e.URL),
 						},
 						2,
 					)
@@ -248,11 +249,11 @@ func (t *Tab) Wait(L *lua.LState) {
 }
 
 func (t *Tab) OnDialog(L *lua.LState) {
-	t.onDialog = L.CheckFunction(2)
+	t.onDialog = L.OptFunction(2, nil)
 }
 
 func (t *Tab) OnDownloaded(L *lua.LState) {
-	t.onDownloaded = L.CheckFunction(2)
+	t.onDownloaded = L.OptFunction(2, nil)
 }
 
 func (t *Tab) Eval(L *lua.LState) int {

@@ -1,4 +1,5 @@
 t = tab.new()
+t:go(TEST.url("/dialog/alert"))
 
 t2 = tab.new(TEST.url())
 t2:onDialog(function(ev)
@@ -73,3 +74,8 @@ assert(called == false)
 t:go(TEST.url("/dialog/prompt"))
 assert(called == true)
 assert(t("span").text == [["hello"]])
+
+
+t:onDialog(function(ev) error("it should be disabled") end)
+t:onDialog(nil)
+t:go(TEST.url("/dialog/alert"))
