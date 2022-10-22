@@ -8,6 +8,21 @@ import (
 	"github.com/yuin/gopher-lua"
 )
 
+func DoLuaLine(L *lua.LState, script string) any {
+	L.DoString("return " + script)
+	v := UnpackLValue(L.Get(1))
+	L.Pop(1)
+	return v
+}
+
+func AssertLuaLine(t *testing.T, L *lua.LState, script string, want any) {
+	t.Helper()
+
+	if diff := cmp.Diff(DoLuaLine(L, script), want); diff != "" {
+		t.Errorf("%s\n%s", script, diff)
+	}
+}
+
 func TestUnpackValue(t *testing.T) {
 	L := lua.NewState()
 	defer L.Close()

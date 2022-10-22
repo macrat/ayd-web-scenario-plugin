@@ -10,7 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/go-cmp/cmp"
 	"github.com/yuin/gopher-lua"
 )
 
@@ -118,21 +117,6 @@ func RegisterTestUtil(L *lua.LState, storage *Storage, server *httptest.Server) 
 	L.SetGlobal("TEST", tbl)
 }
 
-func DoLuaLine(L *lua.LState, script string) any {
-	L.DoString("return " + script)
-	v := UnpackLValue(L.Get(1))
-	L.Pop(1)
-	return v
-}
-
-func AssertLuaLine(t *testing.T, L *lua.LState, script string, want any) {
-	t.Helper()
-
-	if diff := cmp.Diff(DoLuaLine(L, script), want); diff != "" {
-		t.Errorf("%s\n%s", script, diff)
-	}
-}
-
 func Test_testSenarios(t *testing.T) {
 	t.Setenv("TZ", "UTC")
 
@@ -165,9 +149,9 @@ func Test_testSenarios(t *testing.T) {
 			env := NewEnvironment(ctx, logger, s)
 			defer env.Close()
 
-			RegisterTestUtil(env.L, s, server)
+			RegisterTestUtil(env.lua, s, server)
 
-			if err := env.L.DoFile(p); err != nil {
+			if err := env.DoFile(p); err != nil {
 				t.Fatalf(err.Error())
 			}
 		})

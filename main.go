@@ -97,7 +97,7 @@ func RunWebScenario(target *ayd.URL, debug bool, enableRecording bool, callback 
 	env.EnableRecording = enableRecording
 
 	stime := time.Now()
-	err = env.L.DoFile(target.Opaque)
+	err = env.DoFile(target.Opaque)
 	latency := time.Since(stime)
 
 	if err != nil {
