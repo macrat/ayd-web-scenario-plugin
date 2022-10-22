@@ -83,9 +83,12 @@ func (t *Tab) ToLua(L *lua.LState) *lua.LUserData {
 				filepath := t.env.storage.CompleteDownload(e.GUID)
 
 				if t.onDownloaded != nil {
-					go t.env.Callback(
+					go t.env.CallEventHandler(
 						t.onDownloaded,
-						[]lua.LValue{lua.LString(filepath), lua.LNumber(e.TotalBytes)},
+						map[string]lua.LValue{
+							"filepath": lua.LString(filepath),
+							"bytes": lua.LNumber(e.TotalBytes),
+						},
 						0,
 					)
 				}
@@ -97,12 +100,12 @@ func (t *Tab) ToLua(L *lua.LState) *lua.LUserData {
 				page.HandleJavaScriptDialog(true)
 			} else {
 				go func() {
-					result := t.env.Callback(
+					result := t.env.CallEventHandler(
 						t.onDialog,
-						[]lua.LValue{
-							lua.LString(e.Type),
-							lua.LString(e.Message),
-							lua.LString(e.URL),
+						map[string]lua.LValue{
+							"type": lua.LString(e.Type),
+							"message": lua.LString(e.Message),
+							"url": lua.LString(e.URL),
 						},
 						2,
 					)

@@ -105,7 +105,7 @@ The web scinario script is based on lua 5.1 ([GopherLua](https://github.com/yuin
 
   Set a callback function that will called when dialog opened in the tab.
 
-  The callback function has three arguments, `type`, `message`, and `url`.
+  The callback function takes a table as argument, it contains `type`, `message`, and `url`.
   * `type` means dialog type, one of `"alert"`, `"confirm"`, `"prompt"`, and `"beforeunload"`.
   * `message` is the message on the dialog box.
   * `url` is the URL caused this dialog.
@@ -120,7 +120,7 @@ The web scinario script is based on lua 5.1 ([GopherLua](https://github.com/yuin
 
   Set a callback function that will called when file downloaded from the tab.
 
-  The callback function has two arguments, `filepath` and `bytes`.
+  The callback function takes a table as argument, it contains `filepath` and `bytes`.
   * `filepath` is the path to downloaded file.
   * `bytes` is downloaded file size in bytes.
 
