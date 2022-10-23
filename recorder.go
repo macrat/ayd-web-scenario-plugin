@@ -116,16 +116,11 @@ func compressGif(images []*image.Paletted) {
 	width := images[0].Rect.Max.X
 	height := images[0].Rect.Max.Y
 
-	img := image.NewPaletted(images[0].Bounds(), Palette)
-	draw.Draw(img, images[0].Bounds(), images[0], image.ZP, draw.Over)
-
-	for _, next := range images[1:] {
+	for i := len(images) - 1; i > 0; i-- {
 		for y := 0; y < height; y++ {
 			for x := 0; x < width; x++ {
-				if img.At(x, y) == next.At(x, y) {
-					next.Set(x, y, color.Transparent)
-				} else {
-					img.Set(x, y, next.At(x, y))
+				if images[i].At(x, y) == images[i-1].At(x, y) {
+					images[i].Set(x, y, color.Transparent)
 				}
 			}
 		}
