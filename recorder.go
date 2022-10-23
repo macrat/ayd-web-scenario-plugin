@@ -35,7 +35,7 @@ type Recorder struct {
 	images []*image.Paletted
 	ch     chan<- recorderTask
 
-	Done chan interface{}
+	Done chan struct{}
 }
 
 func NewRecorder(ctx context.Context) (*Recorder, error) {
@@ -54,7 +54,7 @@ func NewRecorder(ctx context.Context) (*Recorder, error) {
 	rec := &Recorder{
 		face: face,
 		ch:   ch,
-		Done: make(chan interface{}),
+		Done: make(chan struct{}),
 	}
 
 	go rec.runRecorder(ch)

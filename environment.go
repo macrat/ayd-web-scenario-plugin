@@ -49,7 +49,7 @@ func (env *Environment) Close() error {
 	return nil
 }
 
-func (env *Environment) RaiseError(fmt string, args ...interface{}) {
+func (env *Environment) RaiseError(fmt string, args ...any) {
 	env.lua.RaiseError(fmt, args...)
 }
 

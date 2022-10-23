@@ -14,9 +14,9 @@ func RegisterTime(env *Environment) {
 			return 1
 		},
 		"sleep": func(L *lua.LState) int {
-			AsyncRun(env, func() interface{} {
+			AsyncRun(env, func() struct{} {
 				time.Sleep(time.Duration(float64(L.CheckNumber(1)) * float64(time.Millisecond)))
-				return nil
+				return struct{}{}
 			})
 			return 0
 		},

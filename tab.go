@@ -4,22 +4,59 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 
+	"github.com/chromedp/cdproto"
 	"github.com/chromedp/cdproto/browser"
+	"github.com/chromedp/cdproto/network"
 	"github.com/chromedp/cdproto/page"
 	"github.com/chromedp/chromedp"
 	"github.com/yuin/gopher-lua"
 )
 
+type LoadWaiter struct {
+	sync.Mutex
+
+	waits map[network.RequestID]chan struct{}
+}
+
+func NewLoadWaiter() *LoadWaiter {
+	return &LoadWaiter{
+		waits: make(map[network.RequestID]chan struct{}),
+	}
+}
+
+func (l *LoadWaiter) Complete(id network.RequestID) {
+	l.Lock()
+	defer l.Unlock()
+	if ch, ok := l.waits[id]; ok {
+		close(ch)
+		delete(l.waits, id)
+	}
+}
+
+func (l *LoadWaiter) Wait(id network.RequestID) {
+	ch := make(chan struct{})
+	l.Lock()
+	l.waits[id] = ch
+	l.Unlock()
+	<-ch
+}
+
 type Tab struct {
 	ctx    context.Context
 	cancel context.CancelFunc
+	wg     sync.WaitGroup
 	env    *Environment
+
+	loading *LoadWaiter
 
 	width, height int64
 	onDialog      *lua.LFunction
 	onDownloaded  *lua.LFunction
+	onRequest     *lua.LFunction
+	onResponse    *lua.LFunction
 
 	recorder *Recorder
 }
@@ -28,11 +65,12 @@ func NewTab(ctx context.Context, env *Environment, url string) *Tab {
 	t := AsyncRun(env, func() *Tab {
 		ctx, cancel := chromedp.NewContext(ctx)
 		t := &Tab{
-			ctx:    ctx,
-			cancel: cancel,
-			env:    env,
-			width:  1280,
-			height: 720,
+			ctx:     ctx,
+			cancel:  cancel,
+			env:     env,
+			loading: NewLoadWaiter(),
+			width:   1280,
+			height:  720,
 		}
 		t.runInCallback(
 			browser.SetDownloadBehavior(browser.SetDownloadBehaviorBehaviorAllow).WithDownloadPath(env.storage.Dir).WithEventsEnabled(true),
@@ -82,25 +120,28 @@ func (t *Tab) ToLua(L *lua.LState) *lua.LUserData {
 				filepath := t.env.storage.CompleteDownload(e.GUID)
 
 				if t.onDownloaded != nil {
-					go t.env.CallEventHandler(
-						t.onDownloaded,
-						map[string]lua.LValue{
-							"filepath": lua.LString(filepath),
-							"bytes":    lua.LNumber(e.TotalBytes),
-						},
-						0,
-					)
+					t.wg.Add(1)
+					go func() {
+						t.env.CallEventHandler(
+							t.onDownloaded,
+							map[string]lua.LValue{
+								"filepath": lua.LString(filepath),
+								"bytes":    lua.LNumber(e.TotalBytes),
+							},
+							0,
+						)
+						t.wg.Done()
+					}()
 				}
 			case browser.DownloadProgressStateCanceled:
 				t.env.storage.CancelDownload(e.GUID)
 			}
 		case *page.EventJavascriptDialogOpening:
-			if t.onDialog == nil {
-				go func() {
+			t.wg.Add(1)
+			go func() {
+				if t.onDialog == nil {
 					t.runInCallback(page.HandleJavaScriptDialog(true))
-				}()
-			} else {
-				go func() {
+				} else {
 					result := t.env.CallEventHandler(
 						t.onDialog,
 						map[string]lua.LValue{
@@ -117,6 +158,71 @@ func (t *Tab) ToLua(L *lua.LState) *lua.LUserData {
 						action = action.WithPromptText(string(lua.LVAsString(result[1])))
 					}
 					t.runInCallback(action)
+				}
+				t.wg.Done()
+			}()
+		case *network.EventRequestWillBeSent:
+			if t.onRequest != nil {
+				t.wg.Add(1)
+				go func() {
+					params := map[string]lua.LValue{
+						"id":     lua.LString(e.RequestID.String()),
+						"type":   lua.LString(e.Type.String()),
+						"url":    lua.LString(e.DocumentURL),
+						"method": lua.LString(e.Request.Method),
+					}
+					if e.Request.HasPostData {
+						params["body"] = lua.LString(e.Request.PostData)
+					} else {
+						params["body"] = lua.LNil
+					}
+					t.env.CallEventHandler(t.onRequest, params, 0)
+					t.wg.Done()
+				}()
+			}
+		case *network.EventLoadingFinished:
+			t.loading.Complete(e.RequestID)
+		case *network.EventResponseReceived:
+			if t.onResponse != nil {
+				t.wg.Add(1)
+				go func() {
+					params := map[string]lua.LValue{
+						"id":         lua.LString(e.RequestID.String()),
+						"type":       lua.LString(e.Type.String()),
+						"url":        lua.LString(e.Response.URL),
+						"status":     lua.LNumber(e.Response.Status),
+						"mimetype":   lua.LString(e.Response.MimeType),
+						"remoteIP":   lua.LString(e.Response.RemoteIPAddress),
+						"remotePort": lua.LNumber(e.Response.RemotePort),
+						"length":     lua.LNumber(e.Response.EncodedDataLength),
+						"body": t.env.NewFunction(func(L *lua.LState) int {
+							id, ok := L.GetField(L.CheckTable(1), "id").(lua.LString)
+							if !ok {
+								L.ArgError(1, "expected a table contains id.")
+							}
+
+							var body []byte
+							t.Run("", chromedp.ActionFunc(func(ctx context.Context) (err error) {
+								t.loading.Wait(network.RequestID(id))
+								body, err = network.GetResponseBody(network.RequestID(id)).Do(ctx)
+								var cdperr *cdproto.Error
+								if errors.As(err, &cdperr) && cdperr.Code == -32000 {
+									// -32000 means "no data found"
+									body = nil
+									err = nil
+								}
+								return err
+							}))
+							if body == nil {
+								L.Push(lua.LNil)
+							} else {
+								L.Push(lua.LString(string(body)))
+							}
+							return 1
+						}),
+					}
+					t.env.CallEventHandler(t.onResponse, params, 0)
+					t.wg.Done()
 				}()
 			}
 		}
@@ -208,6 +314,8 @@ func (t *Tab) Reload(L *lua.LState) {
 }
 
 func (t *Tab) Close(L *lua.LState) {
+	t.wg.Wait()
+
 	if t.recorder != nil {
 		t.RecordOnce(L, "$:close()", false)
 	}
@@ -254,6 +362,24 @@ func (t *Tab) OnDialog(L *lua.LState) {
 
 func (t *Tab) OnDownloaded(L *lua.LState) {
 	t.onDownloaded = L.OptFunction(2, nil)
+}
+
+func (t *Tab) updateNetworkConfig() {
+	if t.onRequest == nil && t.onResponse == nil {
+		t.Run("", network.Disable())
+	} else {
+		t.Run("", network.Enable())
+	}
+}
+
+func (t *Tab) OnRequest(L *lua.LState) {
+	t.onRequest = L.OptFunction(2, nil)
+	t.updateNetworkConfig()
+}
+
+func (t *Tab) OnResponse(L *lua.LState) {
+	t.onResponse = L.OptFunction(2, nil)
+	t.updateNetworkConfig()
 }
 
 func (t *Tab) Eval(L *lua.LState) int {
@@ -309,6 +435,8 @@ func RegisterTabType(ctx context.Context, env *Environment) {
 		"wait":         fn((*Tab).Wait),
 		"onDialog":     fn((*Tab).OnDialog),
 		"onDownloaded": fn((*Tab).OnDownloaded),
+		"onRequest":    fn((*Tab).OnRequest),
+		"onResponse":   fn((*Tab).OnResponse),
 		"all": env.NewFunction(func(L *lua.LState) int {
 			L.Push(NewElementsArray(L, CheckTab(L), L.CheckString(2)).ToLua(L))
 			return 1

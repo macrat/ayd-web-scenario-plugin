@@ -65,6 +65,21 @@ func StartTestServer() *httptest.Server {
 		`, r.URL.Query().Get("textarea"))
 	})
 
+	mux.HandleFunc("/post", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("content-type", "text/html")
+		if r.Method == "POST" {
+			fmt.Fprintf(w, `
+				<span>%s</span>
+			`, r.FormValue("value"))
+		} else {
+			fmt.Fprintf(w, `
+				<form method=POST>
+					<input name=value /><input type=submit />
+				</form>
+			`)
+		}
+	})
+
 	mux.HandleFunc("/window-size", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("content-type", "text/html")
 		fmt.Fprintf(w, `
