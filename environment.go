@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"sync/atomic"
 
 	"github.com/yuin/gopher-lua"
 )
@@ -17,7 +18,7 @@ type Environment struct {
 	logger   *Logger
 	storage  *Storage
 	saveWG   sync.WaitGroup
-	recordID int
+	recordID atomic.Int64
 
 	EnableRecording bool
 }
@@ -119,15 +120,15 @@ func (env *Environment) RegisterNewType(name string, methods map[string]lua.LGFu
 
 func (env *Environment) saveRecord(recorder *Recorder) {
 	env.saveWG.Add(1)
-	env.recordID += 1 // TODO: make it thread safe?
-	go func(id int) {
+	id := env.recordID.Add(1)
+	go func(id int64) {
 		<-recorder.Done
 		if f, err := env.storage.Open(fmt.Sprintf("record-%04d.gif", id)); err == nil {
 			defer f.Close()
 			recorder.SaveTo(f)
 		}
 		env.saveWG.Done()
-	}(env.recordID)
+	}(id)
 }
 
 func (env *Environment) registerTab(t *Tab) {
