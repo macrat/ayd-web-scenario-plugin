@@ -70,7 +70,7 @@ func (r *Recorder) runRecorder(ch <-chan recorderTask) {
 	for task := range ch {
 		scr, _, err := image.Decode(bytes.NewReader(task.Screenshot))
 		if err != nil {
-			// TODO: dd error handling
+			// TODO: add error handling
 			continue
 		}
 		bounds := scr.Bounds()
@@ -119,8 +119,8 @@ func compressGif(images []*image.Paletted) {
 	for i := len(images) - 1; i > 0; i-- {
 		for y := 0; y < height; y++ {
 			for x := 0; x < width; x++ {
-				if images[i].At(x, y) == images[i-1].At(x, y) {
-					images[i].Set(x, y, color.Transparent)
+				if images[i].ColorIndexAt(x, y) == images[i-1].ColorIndexAt(x, y) {
+					images[i].SetColorIndex(x, y, uint8(len(Palette)-1))
 				}
 			}
 		}
