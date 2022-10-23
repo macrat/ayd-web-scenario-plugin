@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/macrat/ayd/lib-ayd"
@@ -108,7 +109,7 @@ func TestRunWebScenario(t *testing.T) {
 
 			var r ayd.Record
 
-			RunWebScenario(&ayd.URL{Scheme: "web-scenario", Opaque: "./testdata/_main-test.lua"}, false, false, func(rec ayd.Record) {
+			RunWebScenario(&ayd.URL{Scheme: "web-scenario", Opaque: "./testdata/_main-test.lua"}, 5*time.Minute, false, false, func(rec ayd.Record) {
 				r = rec
 			})
 
@@ -129,6 +130,26 @@ func TestRunWebScenario(t *testing.T) {
 			}
 		})
 	}
+
+	t.Run("timeout", func(t *testing.T) {
+		var r ayd.Record
+
+		RunWebScenario(&ayd.URL{Scheme: "web-scenario", Opaque: "./testdata/_timeout-test.lua"}, 100*time.Millisecond, false, false, func(rec ayd.Record) {
+			r = rec
+		})
+
+		if r.Status != ayd.StatusAborted {
+			t.Errorf("expected ABORTED status but got %s", r.Status)
+		}
+
+		if r.Latency > 500*time.Millisecond {
+			t.Errorf("unexpected latency: %s", r.Latency)
+		}
+
+		if r.Message != "I'm gonna be timeout" {
+			t.Errorf("unexpected message: %q", r.Message)
+		}
+	})
 }
 
 func TestNormalizeURL(t *testing.T) {

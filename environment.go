@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 
@@ -30,32 +31,40 @@ func NewEnvironment(ctx context.Context, logger *Logger, s *Storage) *Environmen
 		logger:  logger,
 		storage: s,
 	}
+	env.Lock()
 
 	RegisterLogger(L, logger)
 	RegisterElementsArrayType(ctx, L)
 	RegisterElementType(ctx, L)
 	RegisterTabType(ctx, env)
-	RegisterTime(env)
+	RegisterTime(ctx, env)
 
 	return env
 }
 
 func (env *Environment) Close() error {
+	defer env.Unlock()
 	for _, t := range env.tabs {
-		t.Close(env.lua)
+		t.Close()
 	}
 	env.lua.Close()
 	env.saveWG.Wait()
 	return nil
 }
 
-func (env *Environment) RaiseError(fmt string, args ...any) {
-	env.lua.RaiseError(fmt, args...)
+func (env *Environment) HandleError(err error) {
+	if err != nil {
+		if errors.Is(err, context.DeadlineExceeded) {
+			env.lua.RaiseError("timeout")
+		} else if errors.Is(err, context.Canceled) {
+			env.lua.RaiseError("interrupted")
+		} else {
+			env.lua.RaiseError("%s", err)
+		}
+	}
 }
 
 func (env *Environment) DoFile(path string) error {
-	env.Lock()
-	defer env.Unlock()
 	return env.lua.DoFile(path)
 }
 

@@ -10,3 +10,5 @@ for _, elm in ipairs(t:all(".component-container:not([style*=\"display: none\"])
 
     assert(status == "operational", name .. " is not operational!")
 end
+
+t:close()

@@ -9,3 +9,5 @@ time.sleep(1*time.second)
 for i, x in ipairs(t:all("h1").text) do
     print.extra(i, x)
 end
+
+t:close()

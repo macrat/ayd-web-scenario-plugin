@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -143,10 +142,7 @@ func Test_testSenarios(t *testing.T) {
 	server := StartTestServer()
 	defer server.Close()
 
-	ctx, cancel := NewContext(nil)
-	defer cancel()
-
-	ctx, cancel = context.WithTimeout(ctx, 5*time.Minute)
+	ctx, cancel := NewContext(1*time.Minute, nil)
 	defer cancel()
 
 	for _, p := range files {

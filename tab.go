@@ -82,9 +82,7 @@ func NewTab(ctx context.Context, env *Environment, url string) *Tab {
 	if env.EnableRecording {
 		var err error
 		t.recorder, err = NewRecorder(ctx)
-		if err != nil {
-			env.RaiseError("%s", err)
-		}
+		env.HandleError(err)
 	}
 
 	if url != "" {
@@ -231,7 +229,7 @@ func (t *Tab) ToLua(L *lua.LState) *lua.LUserData {
 	return lt
 }
 
-func (t *Tab) RecordOnce(L *lua.LState, taskName string, isAfter bool) {
+func (t *Tab) RecordOnce(taskName string, isAfter bool) {
 	if taskName != "" && t.recorder != nil {
 		var buf []byte
 		t.Run(
@@ -244,19 +242,9 @@ func (t *Tab) RecordOnce(L *lua.LState, taskName string, isAfter bool) {
 	}
 }
 
-func (t *Tab) handleError(err error) {
-	if err != nil {
-		if errors.Is(err, context.DeadlineExceeded) {
-			t.env.RaiseError("timeout")
-		} else {
-			t.env.RaiseError("%s", err)
-		}
-	}
-}
-
 // runCallback execute browser action without handle GIL.
 func (t *Tab) runInCallback(actions ...chromedp.Action) {
-	t.handleError(chromedp.Run(t.ctx, actions...))
+	t.env.HandleError(chromedp.Run(t.ctx, actions...))
 }
 
 func (t *Tab) Run(taskName string, action ...chromedp.Action) {
@@ -278,7 +266,7 @@ func (t *Tab) Run(taskName string, action ...chromedp.Action) {
 		}
 		return chromedp.Run(t.ctx, action...)
 	})
-	t.handleError(err)
+	t.env.HandleError(err)
 }
 
 func (t *Tab) RunSelector(query string, action ...chromedp.Action) {
@@ -288,7 +276,7 @@ func (t *Tab) RunSelector(query string, action ...chromedp.Action) {
 
 		return chromedp.Run(ctx, action...)
 	})
-	t.handleError(err)
+	t.env.HandleError(err)
 }
 
 func (t *Tab) Save(name, ext string, data []byte) error {
@@ -313,20 +301,28 @@ func (t *Tab) Reload(L *lua.LState) {
 	t.Run("$:reload()", chromedp.Reload())
 }
 
-func (t *Tab) Close(L *lua.LState) {
-	t.wg.Wait()
+func (t *Tab) Close() error {
+	AsyncRun(t.env, func() struct{} {
+		t.wg.Wait()
 
+		t.env.unregisterTab(t)
+
+		t.cancel()
+
+		if t.recorder != nil {
+			t.env.saveRecord(t.recorder)
+		}
+
+		return struct{}{}
+	})
+	return nil
+}
+
+func (t *Tab) LClose(L *lua.LState) {
 	if t.recorder != nil {
-		t.RecordOnce(L, "$:close()", false)
+		t.RecordOnce("$:close()", false)
 	}
-
-	t.env.unregisterTab(t)
-
-	t.cancel()
-
-	if t.recorder != nil {
-		t.env.saveRecord(t.recorder)
-	}
+	t.Close()
 }
 
 func (t *Tab) Screenshot(L *lua.LState) {
@@ -429,7 +425,7 @@ func RegisterTabType(ctx context.Context, env *Environment) {
 		"forward":      fn((*Tab).Forward),
 		"back":         fn((*Tab).Back),
 		"reload":       fn((*Tab).Reload),
-		"close":        fn((*Tab).Close),
+		"close":        fn((*Tab).LClose),
 		"screenshot":   fn((*Tab).Screenshot),
 		"setViewport":  fn((*Tab).SetViewport),
 		"wait":         fn((*Tab).Wait),

@@ -1,12 +1,13 @@
 package main
 
 import (
+	"context"
 	"time"
 
 	"github.com/yuin/gopher-lua"
 )
 
-func RegisterTime(env *Environment) {
+func RegisterTime(ctx context.Context, env *Environment) {
 	env.RegisterNewType("time", map[string]lua.LGFunction{
 		"now": func(L *lua.LState) int {
 			env.Yield()
@@ -14,10 +15,20 @@ func RegisterTime(env *Environment) {
 			return 1
 		},
 		"sleep": func(L *lua.LState) int {
-			AsyncRun(env, func() struct{} {
-				time.Sleep(time.Duration(float64(L.CheckNumber(1)) * float64(time.Millisecond)))
-				return struct{}{}
+			dur := time.Duration(float64(L.CheckNumber(1)) * float64(time.Millisecond))
+			err := AsyncRun(env, func() error {
+				var err error
+				timer := time.NewTimer(dur)
+				select {
+				case <-timer.C:
+					err = nil
+				case <-ctx.Done():
+					err = ctx.Err()
+				}
+				timer.Stop()
+				return err
 			})
+			env.HandleError(err)
 			return 0
 		},
 		"format": func(L *lua.LState) int {

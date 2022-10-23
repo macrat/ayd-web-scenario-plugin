@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/signal"
 	"time"
 
 	"github.com/chromedp/chromedp"
@@ -45,19 +46,21 @@ func StartBrowser(ctx context.Context, debuglog *ayd.Logger) (context.Context, c
 	return ctx, cancel
 }
 
-func NewContext(debuglog *ayd.Logger) (context.Context, context.CancelFunc) {
-	ctx, cancel1 := context.WithTimeout(context.Background(), time.Hour)
-	ctx, cancel2 := chromedp.NewExecAllocator(ctx, chromedp.DefaultExecAllocatorOptions[:]...)
-	ctx, cancel3 := StartBrowser(ctx, debuglog)
+func NewContext(timeout time.Duration, debuglog *ayd.Logger) (context.Context, context.CancelFunc) {
+	ctx, stopTimeout := context.WithTimeout(context.Background(), timeout)
+	ctx, stopNotify := signal.NotifyContext(ctx, os.Interrupt)
+	ctx, stopAllocator := chromedp.NewExecAllocator(ctx, chromedp.DefaultExecAllocatorOptions[:]...)
+	ctx, stopBrowser := StartBrowser(ctx, debuglog)
 
 	return ctx, func() {
-		cancel3()
-		cancel2()
-		cancel1()
+		stopBrowser()
+		stopAllocator()
+		stopNotify()
+		stopTimeout()
 	}
 }
 
-func RunWebScenario(target *ayd.URL, debug bool, enableRecording bool, callback func(ayd.Record)) {
+func RunWebScenario(target *ayd.URL, timeout time.Duration, debug bool, enableRecording bool, callback func(ayd.Record)) {
 	timestamp := time.Now()
 
 	logger := &Logger{Debug: debug, Status: ayd.StatusHealthy}
@@ -88,27 +91,34 @@ func RunWebScenario(target *ayd.URL, debug bool, enableRecording bool, callback 
 		l := ayd.NewLoggerWithWriter(f, target)
 		browserlog = &l
 	}
-	ctx, cancel := NewContext(browserlog)
+
+	ctx, cancel := NewContext(timeout, browserlog)
 	defer cancel()
 
 	env := NewEnvironment(ctx, logger, storage)
-	defer env.Close()
-
 	env.EnableRecording = enableRecording
+	defer env.Close()
 
 	stime := time.Now()
 	err = env.DoFile(target.Opaque)
 	latency := time.Since(stime)
 
 	if err != nil {
+		logger.Status = ayd.StatusFailure
+
 		var apierr *lua.ApiError
-		if errors.As(err, &apierr) {
+		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+			logger.SetExtra("error", "timeout")
+			logger.Status = ayd.StatusAborted
+		} else if errors.Is(ctx.Err(), context.Canceled) {
+			logger.SetExtra("error", "interrupted")
+			logger.Status = ayd.StatusAborted
+		} else if errors.As(err, &apierr) {
 			logger.SetExtra("error", apierr.Object.String())
 			logger.SetExtra("trace", apierr.StackTrace)
 		} else {
 			logger.SetExtra("error", err.Error())
 		}
-		logger.Status = ayd.StatusFailure
 	}
 
 	if xs := storage.Artifacts(); len(xs) > 0 {
@@ -166,7 +176,7 @@ func main() {
 		os.Exit(2)
 	}
 
-	RunWebScenario(target, *debugMode, *enableRecording, func(r ayd.Record) {
+	RunWebScenario(target, 50*time.Minute, *debugMode, *enableRecording, func(r ayd.Record) {
 		ayd.NewLogger(target).Print(r)
 	})
 }
