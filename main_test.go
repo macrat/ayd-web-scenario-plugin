@@ -107,11 +107,7 @@ func TestRunWebScenario(t *testing.T) {
 			t.Setenv("TEST_EXTRA", tt.Extra)
 			t.Setenv("TEST_ERROR", tt.Error)
 
-			var r ayd.Record
-
-			RunWebScenario(&ayd.URL{Scheme: "web-scenario", Opaque: "./testdata/_main-test.lua"}, 5*time.Minute, false, false, func(rec ayd.Record) {
-				r = rec
-			})
+			r := RunWebScenario(&ayd.URL{Scheme: "web-scenario", Opaque: "./testdata/_main-test.lua"}, 5*time.Minute, false, false)
 
 			if r.Latency == 0 {
 				t.Errorf("latency should not be 0")
@@ -132,11 +128,7 @@ func TestRunWebScenario(t *testing.T) {
 	}
 
 	t.Run("timeout", func(t *testing.T) {
-		var r ayd.Record
-
-		RunWebScenario(&ayd.URL{Scheme: "web-scenario", Opaque: "./testdata/_timeout-test.lua"}, 100*time.Millisecond, false, false, func(rec ayd.Record) {
-			r = rec
-		})
+		r := RunWebScenario(&ayd.URL{Scheme: "web-scenario", Opaque: "./testdata/_timeout-test.lua"}, 100*time.Millisecond, false, false)
 
 		if r.Status != ayd.StatusAborted {
 			t.Errorf("expected ABORTED status but got %s", r.Status)

@@ -60,7 +60,7 @@ func NewContext(timeout time.Duration, debuglog *ayd.Logger) (context.Context, c
 	}
 }
 
-func RunWebScenario(target *ayd.URL, timeout time.Duration, debug bool, enableRecording bool, callback func(ayd.Record)) {
+func RunWebScenario(target *ayd.URL, timeout time.Duration, debug bool, enableRecording bool) ayd.Record {
 	timestamp := time.Now()
 
 	logger := &Logger{Debug: debug, Status: ayd.StatusHealthy}
@@ -68,24 +68,22 @@ func RunWebScenario(target *ayd.URL, timeout time.Duration, debug bool, enableRe
 	baseDir := os.Getenv("WEBSCENARIO_ARTIFACT_DIR")
 	storage, err := NewStorage(baseDir, target.Opaque, timestamp)
 	if err != nil {
-		callback(ayd.Record{
+		return ayd.Record{
 			Time:    timestamp,
 			Status:  ayd.StatusFailure,
 			Message: err.Error(),
-		})
-		return
+		}
 	}
 
 	var browserlog *ayd.Logger
 	if debug {
 		f, err := storage.Open("browser.log")
 		if err != nil {
-			callback(ayd.Record{
+			return ayd.Record{
 				Time:    timestamp,
 				Status:  ayd.StatusFailure,
 				Message: err.Error(),
-			})
-			return
+			}
 		}
 		defer f.Close()
 		l := ayd.NewLoggerWithWriter(f, target)
@@ -97,11 +95,12 @@ func RunWebScenario(target *ayd.URL, timeout time.Duration, debug bool, enableRe
 
 	env := NewEnvironment(ctx, logger, storage)
 	env.EnableRecording = enableRecording
-	defer env.Close()
 
 	stime := time.Now()
 	err = env.DoFile(target.Opaque)
 	latency := time.Since(stime)
+
+	env.Close()
 
 	if err != nil {
 		logger.Status = ayd.StatusFailure
@@ -128,7 +127,7 @@ func RunWebScenario(target *ayd.URL, timeout time.Duration, debug bool, enableRe
 	r := logger.AsRecord()
 	r.Time = timestamp
 	r.Latency = latency
-	callback(r)
+	return r
 }
 
 func ParseTargetURL(s string) (*ayd.URL, error) {
@@ -176,7 +175,6 @@ func main() {
 		os.Exit(2)
 	}
 
-	RunWebScenario(target, 50*time.Minute, *debugMode, *enableRecording, func(r ayd.Record) {
-		ayd.NewLogger(target).Print(r)
-	})
+	rec := RunWebScenario(target, 50*time.Minute, *debugMode, *enableRecording)
+	ayd.NewLogger(target).Print(rec)
 }
