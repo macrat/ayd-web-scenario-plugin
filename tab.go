@@ -346,6 +346,21 @@ func (t *Tab) SetViewport(L *lua.LState) {
 	t.width, t.height = w, h
 }
 
+func (t *Tab) Recording(L *lua.LState) {
+	if L.CheckBool(2) {
+		if t.recorder == nil {
+			var err error
+			t.recorder, err = NewRecorder(t.ctx)
+			t.env.HandleError(err)
+		}
+	} else {
+		if t.recorder != nil {
+			t.recorder.Close()
+			t.recorder = nil
+		}
+	}
+}
+
 func (t *Tab) Wait(L *lua.LState) {
 	query := L.CheckString(2)
 
@@ -428,6 +443,7 @@ func RegisterTabType(ctx context.Context, env *Environment) {
 		"close":        fn((*Tab).LClose),
 		"screenshot":   fn((*Tab).Screenshot),
 		"setViewport":  fn((*Tab).SetViewport),
+		"recording":    fn((*Tab).Recording),
 		"wait":         fn((*Tab).Wait),
 		"onDialog":     fn((*Tab).OnDialog),
 		"onDownloaded": fn((*Tab).OnDownloaded),

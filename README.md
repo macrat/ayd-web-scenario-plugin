@@ -93,6 +93,10 @@ The web scinario script is based on lua 5.1 ([GopherLua](https://github.com/yuin
   Take a screenshot of current viewport.
   If you want a full page screenshot, you can use `tab("body"):screenshot()` instead of this method.
 
+- `tab:recording(bool)`
+
+  Enable or disable animated GIF recording.
+
 - `tab:eval(script)`
 
   Execute JavaScript code in the tab, and returns a value.

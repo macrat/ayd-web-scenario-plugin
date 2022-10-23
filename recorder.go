@@ -34,6 +34,7 @@ type Recorder struct {
 	face   font.Face
 	images []*image.Paletted
 	ch     chan<- recorderTask
+	stop   context.CancelFunc
 
 	Done chan struct{}
 }
@@ -51,9 +52,12 @@ func NewRecorder(ctx context.Context) (*Recorder, error) {
 
 	ch := make(chan recorderTask, 8)
 
+	ctx, cancel := context.WithCancel(ctx)
+
 	rec := &Recorder{
 		face: face,
 		ch:   ch,
+		stop: cancel,
 		Done: make(chan struct{}),
 	}
 
@@ -93,6 +97,12 @@ func (r *Recorder) runRecorder(ch <-chan recorderTask) {
 		r.images = append(r.images, img)
 	}
 	close(r.Done)
+}
+
+func (r *Recorder) Close() error {
+	r.stop()
+	<-r.Done
+	return nil
 }
 
 func (r *Recorder) RecordOnce(taskName string, isAfter bool, screenshot []byte) error {
