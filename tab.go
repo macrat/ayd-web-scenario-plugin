@@ -81,7 +81,7 @@ func NewTab(ctx context.Context, env *Environment, url string) *Tab {
 
 	if env.EnableRecording {
 		var err error
-		t.recorder, err = NewRecorder(ctx)
+		t.recorder, err = NewRecorder(t.ctx)
 		env.HandleError(err)
 	}
 
