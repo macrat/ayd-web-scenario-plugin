@@ -2,13 +2,13 @@ t1 = tab.new(TEST.url("/download"))
 t2 = tab.new(TEST.url("/download"))
 
 download_count = 0
-t1:onDownloaded(function(ev)
-    assert(TEST.storage("data.txt") == ev.filepath)
-    assert(ev.bytes == 14)
+t1:onDownloaded(function(file)
+    assert(TEST.storage("data.txt") == file.path)
+    assert(file.bytes == 14)
     download_count = download_count + 1
 end)
 
-t2:onDownloaded(function(ev)
+t2:onDownloaded(function(file)
     error("should not reach here")
 end)
 

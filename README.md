@@ -121,8 +121,8 @@ __NOTE__: You can set only one callback function for each events. The previous c
 
   Set a callback function that will called when file downloaded from the tab.
 
-  The callback function takes a table as argument, it contains `filepath` and `bytes`.
-  * `filepath` is the path to downloaded file.
+  The callback function takes a table as argument, it contains `path` and `bytes`.
+  * `path` is the path to downloaded file.
   * `bytes` is downloaded file size in bytes.
 
 - `tab:onRequest(callback)`

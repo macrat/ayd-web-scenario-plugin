@@ -125,8 +125,8 @@ func (t *Tab) ToLua(L *lua.LState) *lua.LUserData {
 						t.env.CallEventHandler(
 							t.onDownloaded,
 							map[string]lua.LValue{
-								"filepath": lua.LString(filepath),
-								"bytes":    lua.LNumber(e.TotalBytes),
+								"path":  lua.LString(filepath),
+								"bytes": lua.LNumber(e.TotalBytes),
 							},
 							0,
 						)
