@@ -70,9 +70,28 @@ The web scinario script is based on lua 5.1 ([GopherLua](https://github.com/yuin
 
 #### wait and get child elements
 
-- `tab(query)` / `tab:all(query)`
+- `tab(query)`
 
-  Get element(s) using a query. These are similar to `document.querySelector` or `document.querySelectorAll`.
+  Get an element using a query.
+  This is similar to `document.querySelector` in JavaScript.
+
+  This function raise an error if there is no element to match to the query.
+
+- `tab:all(query)`
+
+  Get elements table using a query.
+  This is similar to `document.querySelectorAll` in JavaScript.
+
+  This function returns a table.
+  The result of this method is a table, but it also can be used as an iterator like below code, rather than normal tables.
+
+  ``` lua
+  for elm in tab:all("span") do
+    print(elm.text)
+  end
+  ```
+
+  This function never raise an error even if there is no element to match to the query.
 
 - `tab:wait(query)`
 
@@ -156,7 +175,7 @@ __NOTE__: You can set only one callback function for each events. The previous c
   * `body` is a method to read the received body. This method returns a string if succeeded to get body. Otherwise, for instance if body is too large, it returns nil.
 
 
-## element / elementsarray
+## element
 
 ### retrieve information
 
@@ -164,11 +183,6 @@ __NOTE__: You can set only one callback function for each events. The previous c
 
   Get text, innerHTML, outerHTML, value of the element.
   These are the same as JavaScript's property.
-
-- `elementsarray.text` / `elementsarray.innerHTML` / `elementsarray.outerHTML` / `elementsarray.value`
-
-  Get text, innerHTML, outerHTML, value of the elements.
-  There are almost the same as `element`'s one, but returns an array of strings.
 
 - `element[property]`
 
@@ -180,43 +194,36 @@ __NOTE__: You can set only one callback function for each events. The previous c
 
   Take a screenshot of the element.
 
-  __NOTE__: `elementsarray` doesn't have these methods.
-
 ### input and control
 
-- `element:sendKeys(keys)` / `elementsarray:sendKeys(keys)`
+- `element:sendKeys(keys)`
 
-  Send keys into the element(s).
+  Send keys into the element.
 
-- `element:setValue(value)` / `elementsarray:setValue(value)`
+- `element:setValue(value)`
 
-  Set value into the element(s).
+  Set value into the element.
   These methods can used for HTML elements have `.value` property in JavaScript.
 
-- `element:click()` / `elementsarray:click()`
+- `element:click()`
 
-  Click on the element(s).
+  Click on the element.
 
 - `element:submit()`
 
   Submit the form contains the element.
 
-  __NOTE__: `elementsarray` doesn't have this method.
-
 - `element:focus()` / `element:blur()`
 
   Set or unset focus on the element.
 
-  __NOTE__: `elementsarray` doesn't have these methods.
-
 ### get child elements
 
-- `element(query)` / `elementsarray(query)`
+- `element(query)`
 
-  Get an element from children of this element(s).
-  `element(query)` returns a single `element`, but `elementsarray(query)` returns `elementsarray`.
+  Get an element from children of this element.
 
-- `element:all(query)` / `elementsarray:all(query)`
+- `element:all(query)`
 
-  Get elements from children of this element(s).
-  Both methods returns `elementsarray`.
+  Get elements table from children of this element.
+  Please see also `tab:all(query)` method.

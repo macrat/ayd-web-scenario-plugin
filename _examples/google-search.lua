@@ -8,8 +8,8 @@ t("input[type=text]")
 
 time.sleep(1*time.second)
 
-for i, x in ipairs(t:all("h1").text) do
-    print.extra(i, x)
+for i, elm in ipairs(t:all("h1")) do
+    print.extra(string.format("result_%d", i), elm.text)
 end
 
 t:close()

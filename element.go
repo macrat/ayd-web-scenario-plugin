@@ -33,6 +33,42 @@ func (e Element) ToLua(L *lua.LState) *lua.LUserData {
 	return ud
 }
 
+func newElementsTableFromIDs(L *lua.LState, t *Tab, query string, ids []cdp.NodeID) *lua.LTable {
+	tbl := L.NewTable()
+	for _, id := range ids {
+		tbl.Append(Element{
+			query: query,
+			ids:   []cdp.NodeID{id},
+			tab:   t,
+		}.ToLua(L))
+	}
+
+	idx := 1
+	L.SetMetatable(tbl, L.SetFuncs(L.NewTable(), map[string]lua.LGFunction{
+		"__call": func(L *lua.LState) int {
+			if idx > len(ids) {
+				L.Push(lua.LNil)
+			} else {
+				L.Push(tbl.RawGet(lua.LNumber(idx)))
+				idx++
+			}
+			return 1
+		},
+	}))
+
+	return tbl
+}
+
+func NewElementsTable(L *lua.LState, t *Tab, query string) *lua.LTable {
+	var ids []cdp.NodeID
+	t.RunSelector(
+		L,
+		fmt.Sprintf("$:all(%q)", query),
+		chromedp.NodeIDs(query, &ids, chromedp.ByQueryAll, chromedp.AtLeast(0)),
+	)
+	return newElementsTableFromIDs(L, t, query, ids)
+}
+
 func CheckElement(L *lua.LState) Element {
 	if ud, ok := L.Get(1).(*lua.LUserData); ok {
 		if e, ok := ud.Value.(Element); ok {
@@ -64,29 +100,34 @@ func (e Element) Select(L *lua.LState, query string) Element {
 	}
 }
 
-func (e Element) SelectAll(L *lua.LState, query string) ElementsArray {
+func (e Element) SelectAll(L *lua.LState, query string) *lua.LTable {
 	var nodes []*cdp.Node
-	e.tab.RunSelector(L, fmt.Sprintf("$(%q):all(%q)", e.query, query), chromedp.Nodes(e.ids, &nodes, chromedp.ByNodeID))
+	var ids []cdp.NodeID
 
-	var es ElementsArray
-	for _, node := range nodes {
-		var ids []cdp.NodeID
-		e.tab.RunSelector(L, fmt.Sprintf("$(%q):all(%q)", e.query, query), chromedp.NodeIDs(
-			query,
-			&ids,
-			chromedp.ByQueryAll,
-			chromedp.FromNode(node),
-			chromedp.AtLeast(0),
-		))
-		for _, id := range ids {
-			es = append(es, Element{
-				query: query,
-				ids:   []cdp.NodeID{id},
-				tab:   e.tab,
-			})
-		}
-	}
-	return es
+	e.tab.RunSelector(
+		L,
+		fmt.Sprintf("$(%q):all(%q)", e.query, query),
+		chromedp.Nodes(e.ids, &nodes, chromedp.ByNodeID),
+		chromedp.ActionFunc(func(ctx context.Context) error {
+			for _, node := range nodes {
+				var xs []cdp.NodeID
+				err := chromedp.NodeIDs(
+					query,
+					&xs,
+					chromedp.ByQueryAll,
+					chromedp.FromNode(node),
+					chromedp.AtLeast(0),
+				).Do(ctx)
+				if err != nil {
+					return err
+				}
+				ids = append(ids, xs...)
+			}
+			return nil
+		}),
+	)
+
+	return newElementsTableFromIDs(L, e.tab, query, ids)
 }
 
 func (e Element) SendKeys(L *lua.LState) {
@@ -186,7 +227,7 @@ func RegisterElementType(ctx context.Context, L *lua.LState) {
 		"all": L.NewFunction(func(L *lua.LState) int {
 			e := CheckElement(L)
 			query := L.CheckString(2)
-			L.Push(e.SelectAll(L, query).ToLua(L))
+			L.Push(e.SelectAll(L, query))
 			return 1
 		}),
 		"sendKeys":   fn(Element.SendKeys),

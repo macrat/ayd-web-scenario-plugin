@@ -460,7 +460,9 @@ func RegisterTabType(ctx context.Context, env *Environment) {
 		"onRequest":    fn((*Tab).OnRequest),
 		"onResponse":   fn((*Tab).OnResponse),
 		"all": env.NewFunction(func(L *lua.LState) int {
-			L.Push(NewElementsArray(L, CheckTab(L), L.CheckString(2)).ToLua(L))
+			t := CheckTab(L)
+			query := L.CheckString(2)
+			L.Push(NewElementsTable(L, t, query))
 			return 1
 		}),
 		"eval": env.NewFunction(func(L *lua.LState) int {

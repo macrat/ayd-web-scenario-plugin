@@ -3,7 +3,7 @@ t = tab.new("https://githubstatus.com")
 
 t("body"):screenshot("githubstatus.com")
 
-for _, elm in ipairs(t:all(".component-container:not([style*=\"display: none\"]) .component-inner-container")) do
+for elm in t:all(".component-container:not([style*=\"display: none\"]) .component-inner-container") do
     local name = elm(".name").text
     local status = elm["data-component-status"]
     print.extra(name, status)

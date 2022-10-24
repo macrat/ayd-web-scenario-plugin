@@ -35,7 +35,6 @@ func NewEnvironment(ctx context.Context, logger *Logger, s *Storage) *Environmen
 	env.Lock()
 
 	RegisterLogger(L, logger)
-	RegisterElementsArrayType(ctx, L)
 	RegisterElementType(ctx, L)
 	RegisterTabType(ctx, env)
 	RegisterTime(ctx, env)
