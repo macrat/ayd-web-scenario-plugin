@@ -26,7 +26,7 @@ type recorderTask struct {
 	Where      string
 	Name       string
 	IsAfter    bool
-	Screenshot []byte
+	Screenshot *[]byte
 }
 
 type Recorder struct {
@@ -71,7 +71,7 @@ func NewRecorder(ctx context.Context) (*Recorder, error) {
 
 func (r *Recorder) runRecorder(ch <-chan recorderTask) {
 	for task := range ch {
-		scr, _, err := image.Decode(bytes.NewReader(task.Screenshot))
+		scr, _, err := image.Decode(bytes.NewReader(*task.Screenshot))
 		if err != nil {
 			// TODO: add error handling
 			continue
@@ -104,22 +104,26 @@ func (r *Recorder) Close() error {
 	return nil
 }
 
-func (r *Recorder) RecordOnce(where, taskName string, isAfter bool, screenshot []byte) error {
-	r.ch <- recorderTask{
-		Where:      where,
-		Name:       taskName,
-		IsAfter:    isAfter,
-		Screenshot: screenshot,
-	}
+type RecordAction struct {
+	ch   chan<- recorderTask
+	task recorderTask
+}
 
+func (a RecordAction) Do(ctx context.Context) error {
+	a.ch <- a.task
 	return nil
 }
 
-func (r *Recorder) RecordBoth(where, taskName string, before, after []byte) error {
-	if err := r.RecordOnce(where, taskName, false, before); err != nil {
-		return err
+func (r *Recorder) Record(where, taskName string, isAfter bool, screenshot *[]byte) RecordAction {
+	return RecordAction{
+		ch: r.ch,
+		task: recorderTask{
+			Where:      where,
+			Name:       taskName,
+			IsAfter:    isAfter,
+			Screenshot: screenshot,
+		},
 	}
-	return r.RecordOnce(where, taskName, true, after)
 }
 
 func compressGif(images []*image.Paletted) {

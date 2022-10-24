@@ -239,9 +239,7 @@ func (t *Tab) RecordOnce(L *lua.LState, taskName string, isAfter bool) {
 			taskName,
 			false,
 			chromedp.CaptureScreenshot(&buf),
-			chromedp.ActionFunc(func(ctx context.Context) error {
-				return t.recorder.RecordOnce(where, taskName, isAfter, buf)
-			}),
+			t.recorder.Record(where, taskName, isAfter, &buf),
 		)
 	}
 }
@@ -260,15 +258,16 @@ func (t *Tab) Run(L *lua.LState, taskName string, capture bool, action ...chrome
 			var before, after []byte
 
 			action = append(
-				[]chromedp.Action{chromedp.CaptureScreenshot(&before)},
+				[]chromedp.Action{
+					chromedp.CaptureScreenshot(&before),
+					t.recorder.Record(where, taskName, false, &before),
+				},
 				action...,
 			)
 			action = append(
 				action,
 				chromedp.CaptureScreenshot(&after),
-				chromedp.ActionFunc(func(ctx context.Context) error {
-					return t.recorder.RecordBoth(where, taskName, before, after)
-				}),
+				t.recorder.Record(where, taskName, true, &after),
 			)
 		}
 		return chromedp.Run(t.ctx, action...)
