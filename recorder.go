@@ -23,6 +23,7 @@ var (
 )
 
 type recorderTask struct {
+	Where      string
 	Name       string
 	IsAfter    bool
 	Screenshot []byte
@@ -103,8 +104,9 @@ func (r *Recorder) Close() error {
 	return nil
 }
 
-func (r *Recorder) RecordOnce(taskName string, isAfter bool, screenshot []byte) error {
+func (r *Recorder) RecordOnce(where, taskName string, isAfter bool, screenshot []byte) error {
 	r.ch <- recorderTask{
+		Where:      where,
 		Name:       taskName,
 		IsAfter:    isAfter,
 		Screenshot: screenshot,
@@ -113,11 +115,11 @@ func (r *Recorder) RecordOnce(taskName string, isAfter bool, screenshot []byte) 
 	return nil
 }
 
-func (r *Recorder) RecordBoth(taskName string, before, after []byte) error {
-	if err := r.RecordOnce(taskName, false, before); err != nil {
+func (r *Recorder) RecordBoth(where, taskName string, before, after []byte) error {
+	if err := r.RecordOnce(where, taskName, false, before); err != nil {
 		return err
 	}
-	return r.RecordOnce(taskName, true, after)
+	return r.RecordOnce(where, taskName, true, after)
 }
 
 func compressGif(images []*image.Paletted) {

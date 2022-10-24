@@ -63,7 +63,10 @@ func NewContext(timeout time.Duration, debuglog *ayd.Logger) (context.Context, c
 func RunWebScenario(target *ayd.URL, timeout time.Duration, debug bool, enableRecording bool) ayd.Record {
 	timestamp := time.Now()
 
-	logger := &Logger{Debug: debug, Status: ayd.StatusHealthy}
+	logger := &Logger{Status: ayd.StatusHealthy}
+	if debug {
+		logger.DebugOut = os.Stderr
+	}
 
 	baseDir := os.Getenv("WEBSCENARIO_ARTIFACT_DIR")
 	storage, err := NewStorage(baseDir, target.Opaque, timestamp)

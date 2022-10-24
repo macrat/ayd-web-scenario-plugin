@@ -13,7 +13,7 @@ type ElementsArray []Element
 
 func NewElementsArray(L *lua.LState, t *Tab, query string) ElementsArray {
 	var ids []cdp.NodeID
-	t.RunSelector(query, chromedp.NodeIDs(query, &ids, chromedp.ByQueryAll, chromedp.AtLeast(0)))
+	t.RunSelector(L, fmt.Sprintf("$:all(%q)", query), chromedp.NodeIDs(query, &ids, chromedp.ByQueryAll, chromedp.AtLeast(0)))
 
 	var es ElementsArray
 	for _, id := range ids {

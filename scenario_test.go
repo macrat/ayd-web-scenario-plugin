@@ -131,6 +131,13 @@ func RegisterTestUtil(L *lua.LState, storage *Storage, server *httptest.Server) 
 	L.SetGlobal("TEST", tbl)
 }
 
+type DebugWriter testing.T
+
+func (w *DebugWriter) Write(b []byte) (int, error) {
+	(*testing.T)(w).Log(strings.TrimSuffix(string(b), "\n"))
+	return len(b), nil
+}
+
 func Test_testSenarios(t *testing.T) {
 	t.Setenv("TZ", "UTC")
 
@@ -156,7 +163,7 @@ func Test_testSenarios(t *testing.T) {
 				t.Fatalf("failed to prepare storage: %s", err)
 			}
 
-			logger := &Logger{Debug: true}
+			logger := &Logger{DebugOut: (*DebugWriter)(t)}
 			env := NewEnvironment(ctx, logger, s)
 			defer env.Close()
 

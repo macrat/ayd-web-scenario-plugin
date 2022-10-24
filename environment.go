@@ -110,6 +110,10 @@ func (env *Environment) CallEventHandler(f *lua.LFunction, args map[string]lua.L
 	return result
 }
 
+func (env *Environment) StartTask(where, taskName string) {
+	env.logger.StartTask(where, taskName)
+}
+
 func (env *Environment) RegisterNewType(name string, methods map[string]lua.LGFunction, fields map[string]lua.LValue) {
 	tbl := env.lua.SetFuncs(env.lua.NewTypeMetatable(name), methods)
 	for k, v := range fields {

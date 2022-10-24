@@ -3,7 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"os"
+	"io"
 	"strings"
 	"sync"
 
@@ -14,10 +14,10 @@ import (
 type Logger struct {
 	sync.Mutex
 
-	Debug  bool
-	Logs   []string
-	Status ayd.Status
-	Extra  map[string]any
+	DebugOut io.Writer
+	Logs     []string
+	Status   ayd.Status
+	Extra    map[string]any
 }
 
 func (l *Logger) Print(values ...any) {
@@ -39,9 +39,15 @@ func (l *Logger) Print(values ...any) {
 		l.Logs = append(l.Logs, string(x))
 	}
 
-	if l.Debug {
+	if l.DebugOut != nil {
 		s := l.Logs[len(l.Logs)-1]
-		fmt.Fprintln(os.Stdout, s)
+		fmt.Fprintln(l.DebugOut, s)
+	}
+}
+
+func (l *Logger) StartTask(where, name string) {
+	if l.DebugOut != nil {
+		fmt.Fprintln(l.DebugOut, where, name)
 	}
 }
 
@@ -62,8 +68,8 @@ func (l *Logger) SetStatus(status string) {
 
 	l.Status = ayd.ParseStatus(status)
 
-	if l.Debug {
-		fmt.Fprintf(os.Stdout, "::status::%s\n", l.Status)
+	if l.DebugOut != nil {
+		fmt.Fprintf(l.DebugOut, "::status::%s\n", l.Status)
 	}
 }
 
@@ -76,9 +82,9 @@ func (l *Logger) SetExtra(k string, v any) {
 	}
 	l.Extra[k] = v
 
-	if l.Debug {
+	if l.DebugOut != nil {
 		if bs, err := json.Marshal(v); err == nil {
-			fmt.Fprintf(os.Stdout, "::%s::%s\n", k, string(bs))
+			fmt.Fprintf(l.DebugOut, "::%s::%s\n", k, string(bs))
 		}
 	}
 }
