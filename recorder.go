@@ -20,8 +20,6 @@ import (
 
 var (
 	Palette = append(palette.WebSafe, color.Transparent)
-
-	debugCounter = 0
 )
 
 type recorderTask struct {
