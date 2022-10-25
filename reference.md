@@ -267,7 +267,7 @@ Print
 Print values as message output of the execution.
 
 The output will be buffered and doesn't print anything immediately, in the default mode.
-If you want to see them in real time, you can use `--debug` flag when execute `ayd-web-scene` command.
+If you want to see them in real time, you can use `--debug` flag when execute `ayd-web-scenario` command.
 
 #### `print.extra(key, value)`
 
