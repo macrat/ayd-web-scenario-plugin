@@ -4,7 +4,7 @@ Ayd Web-Scenario plugin
 A headless browser controller for [Ayd](https://github.com/macrat/ayd) status monitoring tool.
 
 - [Quick Start](#quick-start)
-- [Reference](reference.md)
+- [Reference](REFERENCE.md)
 
 
 ## Quick Start

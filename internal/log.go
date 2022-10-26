@@ -1,4 +1,4 @@
-package main
+package webscenario
 
 import (
 	"encoding/json"
