@@ -46,14 +46,14 @@ Reload the tab.
 
 #### `tab(query)`
 
-Get an [element](#element) using a `query`.
+Get an [element](#element) using a CSS selector `query`.
 This is similar to `document.querySelector` in JavaScript.
 
 This method raise an error if there is no element to match to the `query`.
 
 #### `tab:all(query)`
 
-Get [element](#element)s table using a `query`.
+Get [element](#element)s table using a CSS selector `query`.
 This is similar to `document.querySelectorAll` in JavaScript.
 
 The result of this method is a table, but it also can be used as an iterator like below code, rather than normal tables.
@@ -65,6 +65,12 @@ end
 ```
 
 This method never raise an error even if there is no element to match to the `query`.
+
+#### `tab:xpath(query)`
+
+Get [element](#element)s table using a XPath `query`.
+
+The result of this method is a table of [element](#element)s with the same metatable with [`tab:all(query)`](#taballquery)'s one.
 
 #### `tab:wait(query)`
 

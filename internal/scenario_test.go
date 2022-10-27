@@ -26,7 +26,7 @@ func StartTestServer() *httptest.Server {
 	mux.HandleFunc("/complex-dom", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("content-type", "text/html")
 		fmt.Fprintf(w, `
-			<div><h1>text</h1><b>hello </b>beautiful <b>world</b><span>!</span></div>
+			<div><h1>text</h1><b>hello </b>beautiful <b class="target">world</b><span>!</span></div>
 			<form action=GET><h1>form</h1><input type="text"><input type="text"></form>
 		`)
 	})

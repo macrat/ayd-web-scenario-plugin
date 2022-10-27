@@ -3,6 +3,7 @@ package webscenario
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/chromedp"
@@ -10,19 +11,20 @@ import (
 )
 
 type Element struct {
-	query string
-	ids   []cdp.NodeID
-	tab   *Tab
+	name string
+	ids  []cdp.NodeID
+	tab  *Tab
 }
 
 func NewElement(L *lua.LState, t *Tab, query string) Element {
 	var ids []cdp.NodeID
-	t.RunSelector(L, fmt.Sprintf("$(%q)", query), chromedp.NodeIDs(query, &ids, chromedp.ByQuery))
+	name := fmt.Sprintf("$(%q)", strings.TrimSpace(query))
+	t.RunSelector(L, name, chromedp.NodeIDs(query, &ids, chromedp.ByQuery))
 
 	return Element{
-		query: query,
-		ids:   ids,
-		tab:   t,
+		name: name,
+		ids:  ids,
+		tab:  t,
 	}
 }
 
@@ -33,13 +35,13 @@ func (e Element) ToLua(L *lua.LState) *lua.LUserData {
 	return ud
 }
 
-func newElementsTableFromIDs(L *lua.LState, t *Tab, query string, ids []cdp.NodeID) *lua.LTable {
+func newElementsTableFromIDs(L *lua.LState, t *Tab, name string, ids []cdp.NodeID) *lua.LTable {
 	tbl := L.NewTable()
 	for _, id := range ids {
 		tbl.Append(Element{
-			query: query,
-			ids:   []cdp.NodeID{id},
-			tab:   t,
+			name: name,
+			ids:  []cdp.NodeID{id},
+			tab:  t,
 		}.ToLua(L))
 	}
 
@@ -61,12 +63,20 @@ func newElementsTableFromIDs(L *lua.LState, t *Tab, query string, ids []cdp.Node
 
 func NewElementsTable(L *lua.LState, t *Tab, query string) *lua.LTable {
 	var ids []cdp.NodeID
+	name := fmt.Sprintf("$:all(%q)", strings.TrimSpace(query))
 	t.RunSelector(
 		L,
-		fmt.Sprintf("$:all(%q)", query),
+		name,
 		chromedp.NodeIDs(query, &ids, chromedp.ByQueryAll, chromedp.AtLeast(0)),
 	)
 	return newElementsTableFromIDs(L, t, query, ids)
+}
+
+func NewElementsTableByXPath(L *lua.LState, t *Tab, query string) *lua.LTable {
+	var ids []cdp.NodeID
+	name := fmt.Sprintf("$:xpath(%q)", strings.TrimSpace(query))
+	t.RunSelector(L, name, chromedp.NodeIDs(query, &ids, chromedp.BySearch))
+	return newElementsTableFromIDs(L, t, name, ids)
 }
 
 func CheckElement(L *lua.LState) Element {
@@ -81,11 +91,13 @@ func CheckElement(L *lua.LState) Element {
 }
 
 func (e Element) Select(L *lua.LState, query string) Element {
+	name := fmt.Sprintf("%s(%q)", e.name, strings.TrimSpace(query))
+
 	var nodes []*cdp.Node
 	var ids []cdp.NodeID
 	e.tab.Run(
 		L,
-		fmt.Sprintf("$(%q)(%q)", e.query, query),
+		name,
 		false,
 		chromedp.Nodes(e.ids, &nodes, chromedp.ByNodeID),
 		chromedp.ActionFunc(func(ctx context.Context) error {
@@ -94,66 +106,60 @@ func (e Element) Select(L *lua.LState, query string) Element {
 	)
 
 	return Element{
-		query: query,
-		ids:   ids,
-		tab:   e.tab,
+		name: name,
+		ids:  ids,
+		tab:  e.tab,
 	}
 }
 
 func (e Element) SelectAll(L *lua.LState, query string) *lua.LTable {
+	name := fmt.Sprintf("%s:all(%q)", e.name, strings.TrimSpace(query))
+
 	var nodes []*cdp.Node
 	var ids []cdp.NodeID
 
 	e.tab.RunSelector(
 		L,
-		fmt.Sprintf("$(%q):all(%q)", e.query, query),
+		name,
 		chromedp.Nodes(e.ids, &nodes, chromedp.ByNodeID),
 		chromedp.ActionFunc(func(ctx context.Context) error {
-			for _, node := range nodes {
-				var xs []cdp.NodeID
-				err := chromedp.NodeIDs(
-					query,
-					&xs,
-					chromedp.ByQueryAll,
-					chromedp.FromNode(node),
-					chromedp.AtLeast(0),
-				).Do(ctx)
-				if err != nil {
-					return err
-				}
-				ids = append(ids, xs...)
-			}
-			return nil
+			return chromedp.NodeIDs(
+				query,
+				&ids,
+				chromedp.ByQueryAll,
+				chromedp.FromNode(nodes[0]),
+				chromedp.AtLeast(0),
+			).Do(ctx)
 		}),
 	)
 
-	return newElementsTableFromIDs(L, e.tab, query, ids)
+	return newElementsTableFromIDs(L, e.tab, name, ids)
 }
 
 func (e Element) SendKeys(L *lua.LState) {
 	text := L.CheckString(2)
-	e.tab.Run(L, fmt.Sprintf("$(%q):sendKeys(%q)", e.query, text), true, chromedp.SendKeys(e.ids, text, chromedp.ByNodeID))
+	e.tab.Run(L, fmt.Sprintf("%s:sendKeys(%q)", e.name, text), true, chromedp.SendKeys(e.ids, text, chromedp.ByNodeID))
 }
 
 func (e Element) SetValue(L *lua.LState) {
 	value := L.CheckString(2)
-	e.tab.Run(L, fmt.Sprintf("$(%q):setValue(%q)", e.query, value), true, chromedp.SetValue(e.ids, value, chromedp.ByNodeID))
+	e.tab.Run(L, fmt.Sprintf("%s:setValue(%q)", e.name, value), true, chromedp.SetValue(e.ids, value, chromedp.ByNodeID))
 }
 
 func (e Element) Click(L *lua.LState) {
-	e.tab.Run(L, fmt.Sprintf("$(%q):click()", e.query), true, chromedp.Click(e.ids, chromedp.ByNodeID))
+	e.tab.Run(L, fmt.Sprintf("%s:click()", e.name), true, chromedp.Click(e.ids, chromedp.ByNodeID))
 }
 
 func (e Element) Submit(L *lua.LState) {
-	e.tab.Run(L, fmt.Sprintf("$(%q):submit()", e.query), true, chromedp.Submit(e.ids, chromedp.ByNodeID))
+	e.tab.Run(L, fmt.Sprintf("%s:submit()", e.name), true, chromedp.Submit(e.ids, chromedp.ByNodeID))
 }
 
 func (e Element) Focus(L *lua.LState) {
-	e.tab.Run(L, fmt.Sprintf("$(%q):focus()", e.query), false, chromedp.Focus(e.ids, chromedp.ByNodeID))
+	e.tab.Run(L, fmt.Sprintf("%s:focus()", e.name), false, chromedp.Focus(e.ids, chromedp.ByNodeID))
 }
 
 func (e Element) Blur(L *lua.LState) {
-	e.tab.Run(L, fmt.Sprintf("$(%q):blur()", e.query), false, chromedp.Blur(e.ids, chromedp.ByNodeID))
+	e.tab.Run(L, fmt.Sprintf("%s:blur()", e.name), false, chromedp.Blur(e.ids, chromedp.ByNodeID))
 }
 
 func (e Element) Screenshot(L *lua.LState) {
@@ -162,7 +168,7 @@ func (e Element) Screenshot(L *lua.LState) {
 	var buf []byte
 	e.tab.Run(
 		L,
-		fmt.Sprintf("$(%q):screenshot(%v)", e.query, name),
+		fmt.Sprintf("%s:screenshot(%v)", e.name, name),
 		false,
 		chromedp.Screenshot(e.ids, &buf, chromedp.ByNodeID),
 		chromedp.ActionFunc(func(ctx context.Context) error {
@@ -173,28 +179,28 @@ func (e Element) Screenshot(L *lua.LState) {
 
 func (e Element) GetText(L *lua.LState) int {
 	var text string
-	e.tab.Run(L, fmt.Sprintf("$(%q).text", e.query), false, chromedp.Text(e.ids, &text, chromedp.ByNodeID))
+	e.tab.Run(L, fmt.Sprintf("%s.text", e.name), false, chromedp.Text(e.ids, &text, chromedp.ByNodeID))
 	L.Push(lua.LString(text))
 	return 1
 }
 
 func (e Element) GetInnerHTML(L *lua.LState) int {
 	var html string
-	e.tab.Run(L, fmt.Sprintf("$(%q).innerHTML", e.query), false, chromedp.InnerHTML(e.ids, &html, chromedp.ByNodeID))
+	e.tab.Run(L, fmt.Sprintf("%s.innerHTML", e.name), false, chromedp.InnerHTML(e.ids, &html, chromedp.ByNodeID))
 	L.Push(lua.LString(html))
 	return 1
 }
 
 func (e Element) GetOuterHTML(L *lua.LState) int {
 	var html string
-	e.tab.Run(L, fmt.Sprintf("$(%q).outerHTML", e.query), false, chromedp.OuterHTML(e.ids, &html, chromedp.ByNodeID))
+	e.tab.Run(L, fmt.Sprintf("%s.outerHTML", e.name), false, chromedp.OuterHTML(e.ids, &html, chromedp.ByNodeID))
 	L.Push(lua.LString(html))
 	return 1
 }
 
 func (e Element) GetValue(L *lua.LState) int {
 	var value string
-	e.tab.Run(L, fmt.Sprintf("$(%q).value", e.query), false, chromedp.Value(e.ids, &value, chromedp.ByNodeID))
+	e.tab.Run(L, fmt.Sprintf("%s.value", e.name), false, chromedp.Value(e.ids, &value, chromedp.ByNodeID))
 	L.Push(lua.LString(value))
 	return 1
 }
@@ -204,7 +210,7 @@ func (e Element) GetAttribute(L *lua.LState) int {
 
 	var value string
 	var ok bool
-	e.tab.Run(L, fmt.Sprintf("$(%q)[%q]", e.query, name), false, chromedp.AttributeValue(e.ids, name, &value, &ok, chromedp.ByNodeID))
+	e.tab.Run(L, fmt.Sprintf("%s[%q]", e.name, name), false, chromedp.AttributeValue(e.ids, name, &value, &ok, chromedp.ByNodeID))
 
 	if ok {
 		L.Push(lua.LString(value))
@@ -267,7 +273,7 @@ func RegisterElementType(ctx context.Context, L *lua.LState) {
 		},
 		"__tostring": func(L *lua.LState) int {
 			e := CheckElement(L)
-			L.Push(lua.LString(fmt.Sprintf("{%s}", e.query)))
+			L.Push(lua.LString(fmt.Sprintf("%s", e.name)))
 			return 1
 		},
 	})

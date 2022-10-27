@@ -465,6 +465,12 @@ func RegisterTabType(ctx context.Context, env *Environment) {
 			L.Push(NewElementsTable(L, t, query))
 			return 1
 		}),
+		"xpath": env.NewFunction(func(L *lua.LState) int {
+			t := CheckTab(L)
+			query := L.CheckString(2)
+			L.Push(NewElementsTableByXPath(L, t, query))
+			return 1
+		}),
 		"eval": env.NewFunction(func(L *lua.LState) int {
 			return CheckTab(L).Eval(L)
 		}),
