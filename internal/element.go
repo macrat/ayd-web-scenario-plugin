@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/chromedp/cdproto/cdp"
+	"github.com/chromedp/cdproto/input"
 	"github.com/chromedp/cdproto/runtime"
 	"github.com/chromedp/chromedp"
 	"github.com/yuin/gopher-lua"
@@ -142,7 +143,36 @@ func (e Element) SelectAll(L *lua.LState, query string) *lua.LTable {
 
 func (e Element) SendKeys(L *lua.LState) {
 	text := L.CheckString(2)
-	e.tab.Run(L, fmt.Sprintf("%s:sendKeys(%q)", e.name, text), true, chromedp.SendKeys(e.ids(), text, chromedp.ByNodeID))
+	mods := L.OptTable(3, L.NewTable())
+
+	mod := input.ModifierNone
+	idx := lua.LNil
+	var value lua.LValue
+	for {
+		idx, value = mods.Next(idx)
+		if value.Type() == lua.LTNil {
+			break
+		}
+		if s, ok := value.(lua.LString); ok {
+			switch s {
+			case "alt":
+				mod |= input.ModifierAlt
+			case "ctrl":
+				mod |= input.ModifierCtrl
+			case "meta":
+				mod |= input.ModifierMeta
+			case "shift":
+				mod |= input.ModifierShift
+			}
+		}
+	}
+
+	e.tab.Run(
+		L,
+		fmt.Sprintf("%s:sendKeys(%q)", e.name, text),
+		true,
+		chromedp.KeyEventNode(e.node, text, chromedp.KeyModifiers(mod)),
+	)
 }
 
 func (e Element) SetValue(L *lua.LState) {

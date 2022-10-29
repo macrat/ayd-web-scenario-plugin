@@ -61,6 +61,11 @@ func StartTestServer() *httptest.Server {
 				<textarea name="textarea"></textarea>
 				<input type=submit>
 			</form>
+
+			<div>
+				<div id="key-listener" tabIndex=-1></div>
+				<script>const kl = document.querySelector('#key-listener'); kl.addEventListener('keydown', (ev) => kl.innerText = (ev.altKey ? 'alt+' : '') + (ev.ctrlKey ? 'ctrl+' : '') + (ev.metaKey ? 'meta+' : '') + (ev.shiftKey ? 'shift+' : '') + ev.key)</script>
+			</div>
 		`, r.URL.Query().Get("textarea"))
 	})
 
