@@ -38,6 +38,7 @@ func NewEnvironment(ctx context.Context, logger *Logger, s *Storage) *Environmen
 	RegisterElementType(ctx, L)
 	RegisterTabType(ctx, env)
 	RegisterTime(ctx, env)
+	RegisterAssert(L)
 	RegisterKey(L)
 
 	return env

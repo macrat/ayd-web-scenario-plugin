@@ -2,8 +2,10 @@ package webscenario
 
 import (
 	"fmt"
+	"io"
 	"math"
 	"reflect"
+	"strings"
 
 	"github.com/yuin/gopher-lua"
 )
@@ -105,4 +107,51 @@ func PackLValue(L *lua.LState, value any) lua.LValue {
 		ud.Value = v.Interface()
 		return ud
 	}
+}
+
+func writeLValueTo(w io.Writer, v lua.LValue) {
+	switch x := v.(type) {
+	case *lua.LNilType:
+		fmt.Fprint(w, "nil")
+	case lua.LBool:
+		fmt.Fprintf(w, "%v", x == lua.LTrue)
+	case lua.LNumber:
+		fmt.Fprintf(w, "%g", float64(x))
+	case lua.LString:
+		fmt.Fprintf(w, "%q", string(x))
+	case *lua.LTable:
+		fmt.Fprint(w, "{")
+
+		n := 0
+
+		x.ForEach(func(k, v lua.LValue) {
+			if n != 0 {
+				fmt.Fprint(w, ", ")
+			}
+			n++
+
+			switch y := k.(type) {
+			case lua.LNumber:
+				if float64(y) != float64(n) {
+					fmt.Fprintf(w, "[%g]=", y)
+				}
+			case lua.LString:
+				fmt.Fprintf(w, "%s=", y)
+			default:
+				writeLValueTo(w, k)
+				fmt.Fprint(w, "=")
+			}
+			writeLValueTo(w, v)
+		})
+
+		fmt.Fprint(w, "}")
+	default:
+		fmt.Fprint(w, x.String())
+	}
+}
+
+func LValueToString(v lua.LValue) string {
+	var s strings.Builder
+	writeLValueTo(&s, v)
+	return s.String()
 }

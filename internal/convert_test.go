@@ -92,3 +92,35 @@ func TestPackValue(t *testing.T) {
 		t.Errorf("%s\n%v", fun, v)
 	}
 }
+
+func TestLValueToString(t *testing.T) {
+	L := lua.NewState()
+	defer L.Close()
+
+	tests := []struct {
+		s    string
+		want string
+	}{
+		{`nil`, "nil"},
+		{`true`, "true"},
+		{`false`, "false"},
+		{`1`, "1"},
+		{`"hello"`, `"hello"`},
+		{`{"hello", "world"}`, `{"hello", "world"}`},
+		{`{hello="world", [1]="one"}`, `{"one", hello="world"}`},
+		{`{[1]="one"}`, `{"one"}`},
+		{`{[1.1]="one"}`, `{[1.1]="one"}`},
+		{`{[2]="two"}`, `{[2]="two"}`},
+		{`{array={3, 2, "one"}}`, `{array={3, 2, "one"}}`},
+	}
+
+	for _, tt := range tests {
+		L.DoString("return " + tt.s)
+		v := LValueToString(L.Get(1))
+		L.Pop(1)
+
+		if v != tt.want {
+			t.Errorf("unexpected result\nsource: %s\nexpected: %s\n but got: %s", tt.s, tt.want, v)
+		}
+	}
+}

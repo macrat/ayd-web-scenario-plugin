@@ -3,8 +3,10 @@ t2 = tab.new(TEST.url("/download"))
 
 download_count = 0
 t1:onDownloaded(function(file)
-    assert(TEST.storage("data.txt") == file.path)
-    assert(file.bytes == 14)
+    assert.eq(file, {
+        path  = TEST.storage("data.txt"),
+        bytes = 14,
+    })
     download_count = download_count + 1
 end)
 
@@ -20,7 +22,7 @@ while download_count < 2 do
     time.sleep(5 * time.millisecond)
 end
 
-assert(download_count == 2)
-assert(io.popen("dir " .. TEST.storage()):read() == "data.txt")
+assert.eq(download_count, 2)
+assert.eq(io.popen("dir " .. TEST.storage()):read(), "data.txt")
 
-assert(io.input(TEST.storage("data.txt")):read() == "this is a data")
+assert.eq(io.input(TEST.storage("data.txt")):read(), "this is a data")

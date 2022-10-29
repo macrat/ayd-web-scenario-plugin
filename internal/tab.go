@@ -201,6 +201,9 @@ func (t *Tab) ToLua(L *lua.LState) *lua.LUserData {
 
 							var body []byte
 							t.Run(L, "$response:body()", false, chromedp.ActionFunc(func(ctx context.Context) (err error) {
+								ctx, cancel := context.WithTimeout(ctx, 1*time.Minute)
+								defer cancel()
+
 								t.loading.Wait(network.RequestID(id))
 								body, err = network.GetResponseBody(network.RequestID(id)).Do(ctx)
 								var cdperr *cdproto.Error

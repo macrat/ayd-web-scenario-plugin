@@ -27,7 +27,7 @@ t("input[name=username]"):sendKeys("test-id")
 t("input[name=password]"):sendKeys("test-password")
 t("input[type=submit]"):click()
 
-assert(t("h1").text == "welcome test-id!")
+assert.eq(t("h1").text, "welcome test-id!")
 ```
 
 Please see also [reference](reference.md) for more information about features you can use in the scenario.

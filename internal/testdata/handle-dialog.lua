@@ -10,70 +10,80 @@ end)
 called = false
 t:onDialog(function(dialog)
     called = true
-    assert(dialog.type == "alert")
-    assert(dialog.message == "welcome!")
-    assert(dialog.url == TEST.url("/dialog/alert"))
+    assert.eq(dialog, {
+        type    = "alert",
+        message = "welcome!",
+        url     = TEST.url("/dialog/alert"),
+    })
     return true
 end)
-assert(called == false)
+assert.eq(called, false)
 t:go(TEST.url("/dialog/alert"))
-assert(called == true)
+assert.eq(called, true)
 
 
 called = false
 t:onDialog(function(dialog)
     called = true
-    assert(dialog.type == "confirm")
-    assert(dialog.message == "are you sure?")
-    assert(dialog.url == TEST.url("/dialog/confirm"))
+    assert.eq(dialog, {
+        type    = "confirm",
+        message = "are you sure?",
+        url     = TEST.url("/dialog/confirm"),
+    })
     return true
 end)
-assert(called == false)
+assert.eq(called, false)
 t:go(TEST.url("/dialog/confirm"))
-assert(called == true)
-assert(t("span").text == "true")
+assert.eq(called, true)
+assert.eq(t("span").text, "true")
 
 
 called = false
 t:onDialog(function(dialog)
     called = true
-    assert(dialog.type == "confirm")
-    assert(dialog.message == "are you sure?")
-    assert(dialog.url == TEST.url("/dialog/confirm"))
+    assert.eq(dialog, {
+        type    = "confirm",
+        message = "are you sure?",
+        url     = TEST.url("/dialog/confirm"),
+    })
     return false
 end)
-assert(called == false)
+assert.eq(called, false)
 t:go(TEST.url("/dialog/confirm"))
-assert(called == true)
-assert(t("span").text == "false")
+assert.eq(called, true)
+assert.eq(t("span").text, "false")
 
 
 called = false
 t:onDialog(function(dialog)
     called = true
-    assert(dialog.type == "prompt")
-    assert(dialog.message == "type something here!")
-    assert(dialog.url == TEST.url("/dialog/prompt"))
+    assert.eq(dialog, {
+        type    = "prompt",
+        message = "type something here!",
+        url     = TEST.url("/dialog/prompt"),
+    })
     return false
 end)
-assert(called == false)
+assert.eq(called, false)
 t:go(TEST.url("/dialog/prompt"))
-assert(called == true)
-assert(t("span").text == [[null]])
+assert.eq(called, true)
+assert.eq(t("span").text, [[null]])
 
 
 called = false
 t:onDialog(function(dialog)
     called = true
-    assert(dialog.type == "prompt")
-    assert(dialog.message == "type something here!")
-    assert(dialog.url == TEST.url("/dialog/prompt"))
+    assert.eq(dialog, {
+        type    = "prompt",
+        message = "type something here!",
+        url     = TEST.url("/dialog/prompt"),
+    })
     return true, "hello"
 end)
-assert(called == false)
+assert.eq(called, false)
 t:go(TEST.url("/dialog/prompt"))
-assert(called == true)
-assert(t("span").text == [["hello"]])
+assert.eq(called, true)
+assert.eq(t("span").text, [["hello"]])
 
 
 t:onDialog(function(dialog) error("it should be disabled") end)

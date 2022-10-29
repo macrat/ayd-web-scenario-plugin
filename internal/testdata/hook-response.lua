@@ -5,16 +5,24 @@ called = false
 t:onResponse(function(resp)
     called = true
 
-    assert(resp.id ~= "")
-    assert(resp.type == "Document")
-    assert(resp.url == TEST.url("/"))
-    assert(resp.status == 200)
-    assert(resp.mimetype == "text/html")
-    assert(resp.remoteIP ~= "")
-    assert(0 < resp.remotePort and resp.remotePort <= 65535)
-    assert(resp.length == 116)
+    assert.ne(resp.id, "")
+    assert.lt(0, resp.remotePort)
+    assert.le(resp.remotePort, 65535)
+    assert.ne(resp.remoteIP, "")
 
-    assert(resp:body() == '<title>world - test</title><div id="greeting">hello <b class="target">world</b>!</div>')
+    assert.eq(resp, {
+        id         = resp.id,
+        type       = "Document",
+        url        = TEST.url("/"),
+        status     = 200,
+        mimetype   = "text/html",
+        remoteIP   = resp.remoteIP,
+        remotePort = resp.remotePort,
+        length     = 116,
+        body       = resp.body,
+    })
+
+    assert.eq(resp:body(), '<title>world - test</title><div id="greeting">hello <b class="target">world</b>!</div>')
 end)
 t:go(TEST.url("/"))
-assert(called == true)
+assert.eq(called, true)

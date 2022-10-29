@@ -6,6 +6,7 @@ The Web-Scenario's script is based on the Lua 5.1 ([GopherLua](https://github.co
 - [tab](#tab): Open, handle, and close browser tab.
 - [element](#element): Read and control HTML element.
 - [print](#print): Report and store information.
+- [assert](#assert): Assertion test values.
 - [time](#time): Get or wait time.
 
 
@@ -297,6 +298,45 @@ The extra values will be stored in the Ayd execution log as is as possible.
 
 Set the status of the execution.
 The `status` argument must be one of `"healthy"`, `"unknown"`, `"degrade"`, `"failure"`, or `"aborted"`.
+
+
+Assert
+------
+
+#### `assert(test, [message])`
+
+Raises error if `test` is false or nil value. Otherwise, it returns all arguments.
+This is the same function as [the original function](https://www.lua.org/manual/5.1/manual.html#pdf-assert) of Lua 5.1.
+
+#### `assert.eq(x, y)`
+
+Raises error if `x` and `y` are not the same.
+This is similar to [`assert(x == y)`](#asserttestmessage), but it provides more convinient error message.
+
+#### `assert.ne(x, y)`
+
+Raises error if `x` and `y` are the same.
+This is similar to [`assert(x ~= y)`](#asserttestmessage), but it provides more convinient error message.
+
+#### `assert.lt(x, y)`
+
+Raises error if `x` is not smaller than `y`.
+This is similar to [`assert(x < y)`](#asserttestmessage), but it provides more convinient error message.
+
+#### `assert.le(x, y)`
+
+Raises error if `x` is not smaller or equals to `y`.
+This is similar to [`assert(x <= y)`](#asserttestmessage), but it provides more convinient error message.
+
+#### `assert.gt(x, y)`
+
+Raises error if `x` is not greater than `y`.
+This is similar to [`assert(x > y)`](#asserttestmessage), but it provides more convinient error message.
+
+#### `assert.ge(x, y)`
+
+Raises error if `x` is not greater or equals to `y`.
+This is similar to [`assert(x >= y)`](#asserttestmessage), but it provides more convinient error message.
 
 
 Time

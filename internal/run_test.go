@@ -56,8 +56,8 @@ func TestRun(t *testing.T) {
 				Status:  ayd.StatusFailure,
 				Message: "It's working!",
 				Extra: map[string]any{
-					"error": "./testdata/_main-test.lua:13: assertion failed!",
-					"trace": "stack traceback:\n\t[G]: in function 'assert'\n\t./testdata/_main-test.lua:13: in main chunk\n\t[G]: ?",
+					"error": `./testdata/_main-test.lua:13: assertion failed: "world" == "incorrect"`,
+					"trace": "stack traceback:\n\t[G]: in function 'eq'\n\t./testdata/_main-test.lua:13: in main chunk\n\t[G]: ?",
 				},
 			},
 		},
@@ -70,8 +70,8 @@ func TestRun(t *testing.T) {
 				Message: "It's working!",
 				Extra: map[string]any{
 					"msg":   "hello",
-					"error": "./testdata/_main-test.lua:13: assertion failed!",
-					"trace": "stack traceback:\n\t[G]: in function 'assert'\n\t./testdata/_main-test.lua:13: in main chunk\n\t[G]: ?",
+					"error": `./testdata/_main-test.lua:13: assertion failed: "world" == "incorrect"`,
+					"trace": "stack traceback:\n\t[G]: in function 'eq'\n\t./testdata/_main-test.lua:13: in main chunk\n\t[G]: ?",
 				},
 			},
 		},

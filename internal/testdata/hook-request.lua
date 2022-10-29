@@ -4,14 +4,18 @@ t = tab.new()
 called = false
 t:onRequest(function(req)
     called = true
-    assert(req.id ~= "")
-    assert(req.type == "Document")
-    assert(req.url == TEST.url("/"))
-    assert(req.method == "GET")
-    assert(req.body == nil)
+    assert.ne(req.id, "")
+
+    assert.eq(req, {
+        id     = req.id,
+        type   = "Document",
+        url    = TEST.url("/"),
+        method = "GET",
+        body   = nil,
+    })
 end)
 t:go(TEST.url("/"))
-assert(called == true)
+assert.eq(called, true)
 
 
 t:onRequest(nil)
@@ -22,12 +26,16 @@ called = false
 t:onRequest(function(req)
     called = true
 
-    assert(req.id ~= "")
-    assert(req.type == "Document")
-    assert(req.url == TEST.url("/post"))
-    assert(req.method == "POST")
-    assert(req.body == "value=hello+POST+form")
+    assert.ne(req.id, "")
+
+    assert.eq(req, {
+        id     = req.id,
+        type   = "Document",
+        url    = TEST.url("/post"),
+        method = "POST",
+        body   = "value=hello+POST+form",
+    })
 end)
 t("input[type=submit]"):click()
-assert(t("span").text == "hello POST form")
-assert(called == true)
+assert.eq(t("span").text, "hello POST form")
+assert.eq(called, true)

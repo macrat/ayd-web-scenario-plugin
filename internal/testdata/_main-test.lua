@@ -10,7 +10,7 @@ if os.getenv("TEST_STATUS") then
     print.status(os.getenv("TEST_STATUS"))
 end
 
-assert(t("#greeting .target").text == os.getenv("TEST_TEXT"))
+assert.eq(t("#greeting .target").text, os.getenv("TEST_TEXT"))
 
 if os.getenv("TEST_ERROR") then
     error(os.getenv("TEST_ERROR"))
