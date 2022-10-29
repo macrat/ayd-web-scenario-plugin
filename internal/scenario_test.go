@@ -66,6 +66,11 @@ func StartTestServer() *httptest.Server {
 				<div id="key-listener" tabIndex=-1></div>
 				<script>const kl = document.querySelector('#key-listener'); kl.addEventListener('keydown', (ev) => kl.innerText = (ev.altKey ? 'alt+' : '') + (ev.ctrlKey ? 'ctrl+' : '') + (ev.metaKey ? 'meta+' : '') + (ev.shiftKey ? 'shift+' : '') + ev.key)</script>
 			</div>
+
+			<div>
+				<div id="click-listener" tabIndex=-1 style="height: 1em"></div>
+				<script>const cl = document.querySelector('#click-listener'); cl.addEventListener('mousedown', (ev) => cl.innerText = ev.button)</script>
+			</div>
 		`, r.URL.Query().Get("textarea"))
 	})
 

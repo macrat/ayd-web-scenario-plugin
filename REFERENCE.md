@@ -230,18 +230,31 @@ If the `name` omitted, file name will be determined automatically by a serial nu
 
 ### Input and control ###
 
-#### `element:sendKeys(keys)`
+#### `element:sendKeys(keys, [modifiers])`
 
 Send `keys` into the element.
+You can use a global variable named `key` to send special keys such as `key.backspace` or `key.f1`.
+
+The `modifiers` accepts a list of key modifiers, such as `"alt"`, `"ctrl"`, `"meta"`, and `"shift"`.
+
+``` lua
+-- send "helle", backspace, and "o world" to the input.
+t("input[type=text]"):sendKeys("helle" .. key.backspace .. "o world")
+
+-- send Ctrl-A and Ctrl-C to the textarea.
+t("textarea"):sendKeys("ac", {"ctrl"})
+```
 
 #### `element:setValue(value)`
 
 Set `value` into the value of element.
 This method can be used for HTML elements have `.value` property in JavaScript, like **input**.
 
-#### `element:click()`
+#### `element:click([button])`
 
 Click on the element.
+
+The `button` is a button name, `"left"`, `"middle"`, `"right"`, `"back"`, or `"forward"`. If omit this, it clicks left mouse button.
 
 #### `element:submit()`
 

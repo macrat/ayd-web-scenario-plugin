@@ -181,7 +181,16 @@ func (e Element) SetValue(L *lua.LState) {
 }
 
 func (e Element) Click(L *lua.LState) {
-	e.tab.Run(L, fmt.Sprintf("%s:click()", e.name), true, chromedp.Click(e.ids(), chromedp.ByNodeID))
+	button := L.OptString(2, "left")
+
+	var name string
+	if button == "left" {
+		name = fmt.Sprintf("%s:click()", e.name)
+	} else {
+		name = fmt.Sprintf("%s:click(%q)", e.name, button)
+	}
+
+	e.tab.Run(L, name, true, chromedp.MouseClickNode(e.node, chromedp.Button(button)))
 }
 
 func (e Element) Submit(L *lua.LState) {
