@@ -357,7 +357,7 @@ func (t *Tab) Screenshot(L *lua.LState) {
 		false,
 		chromedp.CaptureScreenshot(&buf),
 		chromedp.ActionFunc(func(ctx context.Context) error {
-			return t.Save(name, ".jpg", buf)
+			return t.Save(name, ".png", buf)
 		}),
 	)
 }

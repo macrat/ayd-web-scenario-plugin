@@ -215,7 +215,7 @@ func (e Element) Screenshot(L *lua.LState) {
 		false,
 		chromedp.Screenshot(e.ids(), &buf, chromedp.ByNodeID),
 		chromedp.ActionFunc(func(ctx context.Context) error {
-			return e.tab.Save(name, ".jpg", buf)
+			return e.tab.Save(name, ".png", buf)
 		}),
 	)
 }
