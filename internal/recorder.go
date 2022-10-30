@@ -10,12 +10,21 @@ import (
 	_ "image/jpeg"
 	_ "image/png"
 	"io"
+	"os"
+	"strconv"
+	"strings"
 
 	"golang.org/x/image/draw"
 	"golang.org/x/image/font"
 	"golang.org/x/image/font/gofont/goregular"
 	"golang.org/x/image/font/opentype"
 	"golang.org/x/image/math/fixed"
+)
+
+const (
+	SourceWidth  = 1280 - 1280*480/720
+	RecordHeight = 480
+	LineHeight   = 20
 )
 
 var (
@@ -29,32 +38,25 @@ type recorderTask struct {
 	Screenshot *[]byte
 }
 
+type imagePair struct {
+	screen *image.Paletted
+	source *image.Paletted
+}
+
 type Recorder struct {
-	face   font.Face
-	images []*image.Paletted
+	images []imagePair
 	ch     chan<- recorderTask
 	stop   context.CancelFunc
 
 	Done chan struct{}
 }
 
-func NewRecorder(ctx context.Context) (*Recorder, error) {
-	ft, err := opentype.Parse(goregular.TTF)
-	if err != nil {
-		return nil, err
-	}
-
-	face, err := opentype.NewFace(ft, &opentype.FaceOptions{
-		Size: 32,
-		DPI:  72,
-	})
-
+func NewRecorder(ctx context.Context) *Recorder {
 	ch := make(chan recorderTask, 8)
 
 	ctx, cancel := context.WithCancel(ctx)
 
 	rec := &Recorder{
-		face: face,
 		ch:   ch,
 		stop: cancel,
 		Done: make(chan struct{}),
@@ -66,34 +68,41 @@ func NewRecorder(ctx context.Context) (*Recorder, error) {
 		close(ch)
 	}()
 
-	return rec, nil
+	return rec
+}
+
+func parseWhere(where string) (string, int) {
+	where = where[:len(where)-1]
+	pos := strings.LastIndexByte(where, ':')
+	line, err := strconv.Atoi(where[pos+1:])
+	if err != nil {
+		return where[:pos], 0
+	}
+	return where[:pos], line
 }
 
 func (r *Recorder) runRecorder(ch <-chan recorderTask) {
 	for task := range ch {
-		scr, _, err := image.Decode(bytes.NewReader(*task.Screenshot))
+		orig, _, err := image.Decode(bytes.NewReader(*task.Screenshot))
 		if err != nil {
 			// TODO: add error handling
 			continue
 		}
-		bounds := scr.Bounds()
-		bounds.Max.Y += 32
+		size := orig.Bounds().Max
 
-		img := image.NewPaletted(bounds, Palette)
+		resized := image.NewRGBA(image.Rect(0, 0, size.X*RecordHeight/size.Y, RecordHeight))
+		draw.Draw(resized, resized.Bounds(), orig, image.ZP, draw.Src)
+		draw.ApproxBiLinear.Scale(resized, resized.Bounds(), orig, orig.Bounds(), draw.Src, nil)
 
-		bounds.Min.Y += 32
-		draw.FloydSteinberg.Draw(img, bounds, scr, image.ZP)
+		paletted := image.NewPaletted(resized.Bounds(), Palette)
+		draw.FloydSteinberg.Draw(paletted, paletted.Bounds(), resized, image.ZP)
 
-		drawer := &font.Drawer{
-			Dst:  img,
-			Src:  image.White,
-			Face: r.face,
-		}
-		b, _ := drawer.BoundString(task.Name)
-		drawer.Dot.Y = fixed.I(2) - b.Min.Y
-		drawer.DrawString(task.Name)
+		source := sourceImager.LoadAsImage(parseWhere(task.Where))
 
-		r.images = append(r.images, img)
+		r.images = append(r.images, imagePair{
+			screen: paletted,
+			source: source,
+		})
 	}
 	close(r.Done)
 }
@@ -142,10 +151,27 @@ func compressGif(images []*image.Paletted) {
 }
 
 func (r *Recorder) SaveTo(f io.Writer) error {
-	compressGif(r.images)
+	maxX := 0
+	for _, img := range r.images {
+		x := img.screen.Bounds().Max.X
+		if maxX < x {
+			maxX = x
+		}
+	}
+
+	var images []*image.Paletted
+	for _, pair := range r.images {
+		dst := image.NewPaletted(image.Rect(0, 0, maxX+SourceWidth, RecordHeight), Palette)
+		x := (maxX - pair.screen.Bounds().Max.X) / 2
+		draw.Draw(dst, image.Rect(x, 0, maxX-x, RecordHeight), pair.screen, image.ZP, draw.Src)
+		draw.Draw(dst, image.Rect(maxX, 0, maxX+SourceWidth, RecordHeight), pair.source, image.ZP, draw.Src)
+		images = append(images, dst)
+	}
+
+	compressGif(images)
 
 	g := gif.GIF{
-		Image: r.images,
+		Image: images,
 	}
 	for range g.Image {
 		g.Delay = append(g.Delay, 100)
@@ -153,4 +179,88 @@ func (r *Recorder) SaveTo(f io.Writer) error {
 	g.Delay[len(g.Delay)-1] = 500
 
 	return gif.EncodeAll(f, &g)
+}
+
+type SourceImager struct {
+	face    font.Face
+	sources map[string][]string
+}
+
+var (
+	sourceImager *SourceImager
+)
+
+func init() {
+	si, err := NewSourceImager()
+	if err != nil {
+		panic(err)
+	}
+	sourceImager = si
+}
+
+func NewSourceImager() (*SourceImager, error) {
+	ft, err := opentype.Parse(goregular.TTF)
+	if err != nil {
+		return nil, err
+	}
+
+	face, err := opentype.NewFace(ft, &opentype.FaceOptions{
+		Size: 16,
+		DPI:  72,
+	})
+
+	return &SourceImager{
+		face:    face,
+		sources: make(map[string][]string),
+	}, nil
+}
+
+func (s *SourceImager) Load(path string) ([]string, error) {
+	if xs, ok := s.sources[path]; ok {
+		return xs, nil
+	}
+	f, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	xs := strings.Split(strings.ReplaceAll(string(f), "\r", ""), "\n")
+	s.sources[path] = xs
+	return xs, nil
+}
+
+func (s *SourceImager) LoadAsImage(path string, line int) *image.Paletted {
+	img := image.NewPaletted(image.Rect(0, 0, SourceWidth, RecordHeight), Palette)
+
+	lines, err := s.Load(path)
+	if err != nil {
+		return img
+	}
+
+	drawer := &font.Drawer{
+		Dst:  img,
+		Src:  image.White,
+		Face: s.face,
+	}
+
+	offset := line + 3 - RecordHeight/LineHeight
+	if offset < 1 {
+		offset = 1
+	}
+
+	for i, l := range lines[offset-1:] {
+		drawer.Dot.X = fixed.I(LineHeight / 2)
+		drawer.Dot.Y = fixed.I(LineHeight + i*LineHeight)
+
+		if line == i+offset {
+			b, _ := drawer.BoundString(l)
+			draw.Draw(img, image.Rect(b.Min.X.Round()-4, b.Min.Y.Round()-2, b.Max.X.Round()+4, b.Max.Y.Round()+2), &image.Uniform{image.White}, image.ZP, draw.Src)
+			drawer.Src = image.Black
+		} else {
+			drawer.Src = image.White
+		}
+
+		drawer.DrawString(l)
+	}
+
+	return img
 }

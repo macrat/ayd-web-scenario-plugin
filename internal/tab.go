@@ -80,9 +80,7 @@ func NewTab(ctx context.Context, L *lua.LState, env *Environment, url string) *T
 	})
 
 	if env.EnableRecording {
-		var err error
-		t.recorder, err = NewRecorder(t.ctx)
-		env.HandleError(err)
+		t.recorder = NewRecorder(t.ctx)
 	}
 
 	if url != "" {
@@ -362,9 +360,7 @@ func (t *Tab) SetViewport(L *lua.LState) {
 func (t *Tab) Recording(L *lua.LState) {
 	if L.CheckBool(2) {
 		if t.recorder == nil {
-			var err error
-			t.recorder, err = NewRecorder(t.ctx)
-			t.env.HandleError(err)
+			t.recorder = NewRecorder(t.ctx)
 		}
 	} else {
 		if t.recorder != nil {
