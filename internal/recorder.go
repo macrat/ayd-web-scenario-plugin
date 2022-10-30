@@ -7,8 +7,7 @@ import (
 	"image/color"
 	"image/color/palette"
 	"image/gif"
-	_ "image/jpeg"
-	_ "image/png"
+	"image/jpeg"
 	"io"
 	"os"
 	"strconv"
@@ -33,8 +32,6 @@ var (
 
 type recorderTask struct {
 	Where      string
-	Name       string
-	IsAfter    bool
 	Screenshot *[]byte
 }
 
@@ -80,7 +77,7 @@ func (r *Recorder) runRecorder(ch <-chan recorderTask) {
 	buf := image.NewRGBA(image.Rect(0, 0, 900, RecordHeight))
 
 	for task := range ch {
-		orig, _, err := image.Decode(bytes.NewReader(*task.Screenshot))
+		orig, err := jpeg.Decode(bytes.NewReader(*task.Screenshot))
 		if err != nil {
 			// TODO: add error handling
 			continue
@@ -121,13 +118,11 @@ func (a RecordAction) Do(ctx context.Context) error {
 	return nil
 }
 
-func (r *Recorder) Record(where, taskName string, isAfter bool, screenshot *[]byte) RecordAction {
+func (r *Recorder) Record(where string, screenshot *[]byte) RecordAction {
 	return RecordAction{
 		ch: r.ch,
 		task: recorderTask{
 			Where:      where,
-			Name:       taskName,
-			IsAfter:    isAfter,
 			Screenshot: screenshot,
 		},
 	}

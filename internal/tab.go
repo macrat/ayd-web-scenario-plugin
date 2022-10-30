@@ -230,7 +230,20 @@ func (t *Tab) ToLua(L *lua.LState) *lua.LUserData {
 	return lt
 }
 
-func (t *Tab) RecordOnce(L *lua.LState, taskName string, isAfter bool) {
+func captureScreenshotForRecording(buf *[]byte) chromedp.ActionFunc {
+	return chromedp.ActionFunc(func(ctx context.Context) error {
+		var err error
+		*buf, err = page.CaptureScreenshot().
+			WithCaptureBeyondViewport(true).
+			WithFormat(page.CaptureScreenshotFormatJpeg).
+			WithQuality(70).
+			WithOptimizeForSpeed(true).
+			Do(ctx)
+		return err
+	})
+}
+
+func (t *Tab) RecordOnce(L *lua.LState, taskName string) {
 	if taskName != "" && t.recorder != nil {
 		where := L.Where(1)
 
@@ -239,8 +252,8 @@ func (t *Tab) RecordOnce(L *lua.LState, taskName string, isAfter bool) {
 			L,
 			taskName,
 			false,
-			chromedp.CaptureScreenshot(&buf),
-			t.recorder.Record(where, taskName, isAfter, &buf),
+			captureScreenshotForRecording(&buf),
+			t.recorder.Record(where, &buf),
 		)
 	}
 }
@@ -260,15 +273,15 @@ func (t *Tab) Run(L *lua.LState, taskName string, capture bool, action ...chrome
 
 			action = append(
 				[]chromedp.Action{
-					chromedp.CaptureScreenshot(&before),
-					t.recorder.Record(where, taskName, false, &before),
+					captureScreenshotForRecording(&before),
+					t.recorder.Record(where, &before),
 				},
 				action...,
 			)
 			action = append(
 				action,
-				chromedp.CaptureScreenshot(&after),
-				t.recorder.Record(where, taskName, true, &after),
+				captureScreenshotForRecording(&after),
+				t.recorder.Record(where, &after),
 			)
 		}
 		return chromedp.Run(t.ctx, action...)
@@ -329,7 +342,7 @@ func (t *Tab) Close() error {
 
 func (t *Tab) LClose(L *lua.LState) {
 	if t.recorder != nil {
-		t.RecordOnce(L, "$:close()", false)
+		t.RecordOnce(L, "$:close()")
 	}
 	t.Close()
 }
