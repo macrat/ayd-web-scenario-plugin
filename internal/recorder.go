@@ -150,6 +150,14 @@ func compressGif(images []*image.Paletted) {
 	}
 }
 
+func copyImage(dst, src *image.Paletted, rect image.Rectangle, offset image.Point) {
+	for y := rect.Min.Y; y < rect.Max.Y; y++ {
+		for x := rect.Min.X; x < rect.Max.X; x++ {
+			dst.SetColorIndex(x+offset.X, y+offset.Y, src.ColorIndexAt(x, y))
+		}
+	}
+}
+
 func (r *Recorder) SaveTo(f io.Writer) error {
 	maxX := 0
 	for _, img := range r.images {
@@ -163,8 +171,8 @@ func (r *Recorder) SaveTo(f io.Writer) error {
 	for _, pair := range r.images {
 		dst := image.NewPaletted(image.Rect(0, 0, maxX+SourceWidth, RecordHeight), Palette)
 		x := (maxX - pair.screen.Bounds().Max.X) / 2
-		draw.Draw(dst, image.Rect(x, 0, maxX-x, RecordHeight), pair.screen, image.ZP, draw.Src)
-		draw.Draw(dst, image.Rect(maxX, 0, maxX+SourceWidth, RecordHeight), pair.source, image.ZP, draw.Src)
+		copyImage(dst, pair.screen, pair.screen.Bounds(), image.Point{x, 0})
+		copyImage(dst, pair.source, pair.screen.Bounds(), image.Point{maxX, 0})
 		images = append(images, dst)
 	}
 
