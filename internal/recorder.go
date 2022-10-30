@@ -38,13 +38,8 @@ type recorderTask struct {
 	Screenshot *[]byte
 }
 
-type imagePair struct {
-	screen *image.Paletted
-	source *image.Paletted
-}
-
 type Recorder struct {
-	images []imagePair
+	images []*image.Paletted
 	ch     chan<- recorderTask
 	stop   context.CancelFunc
 
@@ -99,15 +94,13 @@ func (r *Recorder) runRecorder(ch <-chan recorderTask) {
 		draw.Draw(buf, bounds, orig, image.ZP, draw.Src)
 		draw.ApproxBiLinear.Scale(buf, bounds, orig, orig.Bounds(), draw.Src, nil)
 
-		paletted := image.NewPaletted(bounds, Palette)
-		draw.FloydSteinberg.Draw(paletted, bounds, buf, image.ZP)
+		img := image.NewPaletted(image.Rect(0, 0, bounds.Max.X+SourceWidth, RecordHeight), Palette)
+		draw.FloydSteinberg.Draw(img, bounds, buf, image.ZP)
 
-		source := sourceImager.LoadAsImage(parseWhere(task.Where))
+		where, line := parseWhere(task.Where)
+		sourceImager.LoadAsImage(img, image.Rect(bounds.Max.X, 0, img.Bounds().Max.X, RecordHeight), where, line)
 
-		r.images = append(r.images, imagePair{
-			screen: paletted,
-			source: source,
-		})
+		r.images = append(r.images, img)
 	}
 	close(r.Done)
 }
@@ -164,21 +157,26 @@ func copyImage(dst, src *image.Paletted, rect image.Rectangle, offset image.Poin
 }
 
 func (r *Recorder) SaveTo(f io.Writer) error {
-	maxX := 0
+	maxWidth := 0
 	for _, img := range r.images {
-		x := img.screen.Bounds().Max.X
-		if maxX < x {
-			maxX = x
+		x := img.Bounds().Max.X - SourceWidth
+		if maxWidth < x {
+			maxWidth = x
 		}
 	}
 
 	var images []*image.Paletted
-	for _, pair := range r.images {
-		dst := image.NewPaletted(image.Rect(0, 0, maxX+SourceWidth, RecordHeight), Palette)
-		x := (maxX - pair.screen.Bounds().Max.X) / 2
-		copyImage(dst, pair.screen, pair.screen.Bounds(), image.Point{x, 0})
-		copyImage(dst, pair.source, pair.screen.Bounds(), image.Point{maxX, 0})
-		images = append(images, dst)
+	for _, img := range r.images {
+		if img.Bounds().Max.X == maxWidth+SourceWidth {
+			images = append(images, img)
+		} else {
+			dst := image.NewPaletted(image.Rect(0, 0, maxWidth+SourceWidth, RecordHeight), Palette)
+			screenWidth := img.Bounds().Max.X - SourceWidth
+			margin := (maxWidth - screenWidth) / 2
+			copyImage(dst, img, image.Rect(0, 0, screenWidth, RecordHeight), image.Point{margin, 0})
+			copyImage(dst, img, image.Rect(screenWidth, 0, img.Bounds().Max.X, RecordHeight), image.Point{maxWidth - screenWidth, 0})
+			images = append(images, dst)
+		}
 	}
 
 	compressGif(images)
@@ -241,12 +239,10 @@ func (s *SourceImager) Load(path string) ([]string, error) {
 	return xs, nil
 }
 
-func (s *SourceImager) LoadAsImage(path string, line int) *image.Paletted {
-	img := image.NewPaletted(image.Rect(0, 0, SourceWidth, RecordHeight), Palette)
-
+func (s *SourceImager) LoadAsImage(img *image.Paletted, rect image.Rectangle, path string, line int) {
 	lines, err := s.Load(path)
 	if err != nil {
-		return img
+		return
 	}
 
 	drawer := &font.Drawer{
@@ -261,8 +257,12 @@ func (s *SourceImager) LoadAsImage(path string, line int) *image.Paletted {
 	}
 
 	for i, l := range lines[offset-1:] {
-		drawer.Dot.X = fixed.I(LineHeight / 2)
-		drawer.Dot.Y = fixed.I(LineHeight + i*LineHeight)
+		if i > RecordHeight/LineHeight {
+			break
+		}
+
+		drawer.Dot.X = fixed.I(rect.Min.X + LineHeight/2)
+		drawer.Dot.Y = fixed.I(rect.Min.Y + LineHeight + i*LineHeight)
 
 		if line == i+offset {
 			b, _ := drawer.BoundString(l)
@@ -275,5 +275,5 @@ func (s *SourceImager) LoadAsImage(path string, line int) *image.Paletted {
 		drawer.DrawString(l)
 	}
 
-	return img
+	return
 }
