@@ -149,3 +149,9 @@ func (env *Environment) unregisterTab(t *Tab) {
 	}
 	env.tabs = tabs
 }
+
+func (env *Environment) RecordOnAllTabs(L *lua.LState, taskName string) {
+	for _, tab := range env.tabs {
+		tab.RecordOnce(L, taskName)
+	}
+}

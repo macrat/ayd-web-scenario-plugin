@@ -2,6 +2,7 @@ package webscenario
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/yuin/gopher-lua"
@@ -15,7 +16,10 @@ func RegisterTime(ctx context.Context, env *Environment) {
 			return 1
 		},
 		"sleep": func(L *lua.LState) int {
-			dur := time.Duration(float64(L.CheckNumber(1)) * float64(time.Millisecond))
+			n := float64(L.CheckNumber(1))
+			env.RecordOnAllTabs(L, fmt.Sprintf("time.sleep(%f)", n))
+
+			dur := time.Duration(n * float64(time.Millisecond))
 			err := AsyncRun(env, func() error {
 				var err error
 				timer := time.NewTimer(dur)
@@ -29,6 +33,8 @@ func RegisterTime(ctx context.Context, env *Environment) {
 				return err
 			})
 			env.HandleError(err)
+
+			env.RecordOnAllTabs(L, fmt.Sprintf("time.sleep(%f)", n))
 			return 0
 		},
 		"format": func(L *lua.LState) int {
