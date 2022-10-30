@@ -82,6 +82,8 @@ func parseWhere(where string) (string, int) {
 }
 
 func (r *Recorder) runRecorder(ch <-chan recorderTask) {
+	buf := image.NewRGBA(image.Rect(0, 0, 900, RecordHeight))
+
 	for task := range ch {
 		orig, _, err := image.Decode(bytes.NewReader(*task.Screenshot))
 		if err != nil {
@@ -90,12 +92,15 @@ func (r *Recorder) runRecorder(ch <-chan recorderTask) {
 		}
 		size := orig.Bounds().Max
 
-		resized := image.NewRGBA(image.Rect(0, 0, size.X*RecordHeight/size.Y, RecordHeight))
-		draw.Draw(resized, resized.Bounds(), orig, image.ZP, draw.Src)
-		draw.ApproxBiLinear.Scale(resized, resized.Bounds(), orig, orig.Bounds(), draw.Src, nil)
+		bounds := image.Rect(0, 0, size.X*RecordHeight/size.Y, RecordHeight)
+		if buf.Bounds().Max.X < bounds.Max.X {
+			buf = image.NewRGBA(bounds)
+		}
+		draw.Draw(buf, bounds, orig, image.ZP, draw.Src)
+		draw.ApproxBiLinear.Scale(buf, bounds, orig, orig.Bounds(), draw.Src, nil)
 
-		paletted := image.NewPaletted(resized.Bounds(), Palette)
-		draw.FloydSteinberg.Draw(paletted, paletted.Bounds(), resized, image.ZP)
+		paletted := image.NewPaletted(bounds, Palette)
+		draw.FloydSteinberg.Draw(paletted, bounds, buf, image.ZP)
 
 		source := sourceImager.LoadAsImage(parseWhere(task.Where))
 
