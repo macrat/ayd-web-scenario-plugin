@@ -8,6 +8,7 @@ The Web-Scenario's script is based on the Lua 5.1 ([GopherLua](https://github.co
 - [print](#print): Report and store information.
 - [assert](#assert): Assertion test values.
 - [time](#time): Get or wait time.
+- [encoding](#encoding): Serialize or deserialize values.
 
 
 Tab
@@ -363,3 +364,15 @@ time.sleep(0.5*time.hour + 10*time.second)  -- Wait for a half hour and 10 secon
 #### `time.format(millisecond)`
 
 Convert a `millisecond` number to `YYYY-mm-dd"T"HH:MM:ssZ` formatted string aka RFC3339 format.
+
+
+Encoding
+--------
+
+#### `fromjson(s)`
+
+Parse JSON string `s`.
+
+#### `tojson(v)`
+
+Encode `v` into JSON string.

@@ -40,6 +40,7 @@ func NewEnvironment(ctx context.Context, logger *Logger, s *Storage) *Environmen
 	RegisterTime(ctx, env)
 	RegisterAssert(L)
 	RegisterKey(L)
+	RegisterEncodings(env)
 
 	return env
 }
@@ -113,6 +114,10 @@ func (env *Environment) CallEventHandler(f *lua.LFunction, args map[string]lua.L
 
 func (env *Environment) StartTask(where, taskName string) {
 	env.logger.StartTask(where, taskName)
+}
+
+func (env *Environment) RegisterFunction(name string, f lua.LGFunction) {
+	env.lua.SetGlobal(name, env.lua.NewFunction(f))
 }
 
 func (env *Environment) RegisterNewType(name string, methods map[string]lua.LGFunction, fields map[string]lua.LValue) {
