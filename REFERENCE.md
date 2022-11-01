@@ -369,6 +369,8 @@ Convert a `millisecond` number to `YYYY-mm-dd"T"HH:MM:ssZ` formatted string aka 
 Encoding
 --------
 
+### JSON ###
+
 #### `fromjson(s)`
 
 Parse JSON string `s`.
@@ -376,3 +378,63 @@ Parse JSON string `s`.
 #### `tojson(v)`
 
 Encode `v` into JSON string.
+
+
+### CSV ###
+
+#### `fromcsv(values, [useheader])`
+
+Parse CSV `values` and make an iterator function.
+The parameter `values` can be a string, a list table, or an iterator function that returns strings.
+
+In default, the first row is used as the header, and each results will be key-value style.
+If the parameter `useheader` is `false`, this function does not use the first row as header and each results will be a list style.
+
+The first of the result is an iterator function that returns each row values.
+And the second of the result is a list of header.
+
+``` lua
+iter, header = fromcsv(io.open("path/to/input.csv"):lines())
+print(header)
+for row in iter do
+  print(row)
+end
+```
+
+#### `tocsv(values, [header])`
+
+Make an iterator that encode `values` to CSV lines.
+
+The parameter `values` can be a table of tables, or an iterator function that returns a table.
+
+If the parameter `header` is a table that list of string, the table will be used as the header.
+
+If `header` is absent or `true`, the keys of the first element will be used as the header.
+The columns is sorted by header name in this mode.
+
+If `header` is `false`, this function does not care about header.
+Only values indexed by number will be included in the result, in this case.
+
+If the `header` is not `false`, you can use values indexed by string or number, in each row' table.
+Values that matched name by string has priority.
+
+``` lua
+iter = tocsv({
+  {hello="world", foo="bar"},
+  {"number", "indexed"},
+  {"you can", foo="combine"}
+}, {"hello", "foo"})
+
+f = io.open("path/to/output.csv")
+for row in iter do
+  f:write(row .. "\n")
+end
+f:close()
+```
+
+``` csv
+hello,foo
+world,bar
+number,indexed
+you can,combine
+```
