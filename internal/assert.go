@@ -33,10 +33,7 @@ func RegisterAssert(L *lua.LState) {
 		}
 	}
 
-	assert := L.GetGlobal("assert")
-
-	meta := L.NewTable()
-	L.SetField(meta, "__index", L.SetFuncs(L.NewTable(), map[string]lua.LGFunction{
+	tbl := L.SetFuncs(L.NewTable(), map[string]lua.LGFunction{
 		"eq": func(L *lua.LState) int {
 			a := UnpackLValue(L.Get(1))
 			b := UnpackLValue(L.Get(2))
@@ -57,6 +54,21 @@ func RegisterAssert(L *lua.LState) {
 		"le": order("<=", func(a, b string) bool { return a <= b }, func(a, b float64) bool { return a <= b }),
 		"gt": order(">", func(a, b string) bool { return a > b }, func(a, b float64) bool { return a > b }),
 		"ge": order(">=", func(a, b string) bool { return a >= b }, func(a, b float64) bool { return a >= b }),
-	}))
-	L.SetMetatable(assert, meta)
+	})
+
+	meta := L.SetFuncs(L.NewTable(), map[string]lua.LGFunction{
+		"__call": func(L *lua.LState) int {
+			if !L.ToBool(2) {
+				L.RaiseError("%s", L.OptString(3, "assertion failed!"))
+			}
+			return 0
+		},
+		"__tostring": func(L *lua.LState) int {
+			L.Push(lua.LString("assert"))
+			return 1
+		},
+	})
+	L.SetMetatable(tbl, meta)
+
+	L.SetGlobal("assert", tbl)
 }
