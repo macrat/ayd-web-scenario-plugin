@@ -11,16 +11,18 @@ import (
 	"github.com/yuin/gopher-lua"
 )
 
-type Encodings Environment
+type Encodings struct {
+	env *Environment
+}
 
-func (e *Encodings) ToJSON(L *lua.LState) int {
+func (e Encodings) ToJSON(L *lua.LState) int {
 	bs, err := json.Marshal(UnpackLValue(L.Get(1)))
-	(*Environment)(e).HandleError(err)
+	e.env.HandleError(err)
 	L.Push(lua.LString(string(bs)))
 	return 1
 }
 
-func (e *Encodings) FromJSON(L *lua.LState) int {
+func (e Encodings) FromJSON(L *lua.LState) int {
 	var v any
 	json.Unmarshal([]byte(L.CheckString(1)), &v)
 	L.Push(PackLValue(L, v))
@@ -81,7 +83,7 @@ func stringsToCSV(ss []string) (string, error) {
 	return strings.TrimSuffix(b.String(), "\n"), nil
 }
 
-func (e *Encodings) ToCSV(L *lua.LState) int {
+func (e Encodings) ToCSV(L *lua.LState) int {
 	var next func() lua.LValue
 
 	switch v := L.Get(1).(type) {
@@ -116,7 +118,7 @@ func (e *Encodings) ToCSV(L *lua.LState) int {
 	L.Push(L.NewFunction(func(L *lua.LState) int {
 		if keep != nil {
 			s, err := stringsToCSV(keep)
-			(*Environment)(e).HandleError(err)
+			e.env.HandleError(err)
 			L.Push(lua.LString(s))
 			keep = nil
 			return 1
@@ -139,7 +141,7 @@ func (e *Encodings) ToCSV(L *lua.LState) int {
 				})
 				sort.Strings(header)
 				s, err := stringsToCSV(header)
-				(*Environment)(e).HandleError(err)
+				e.env.HandleError(err)
 				L.Push(lua.LString(s))
 			} else {
 				var xs []string
@@ -157,7 +159,7 @@ func (e *Encodings) ToCSV(L *lua.LState) int {
 					}
 				}
 				s, err := stringsToCSV(xs)
-				(*Environment)(e).HandleError(err)
+				e.env.HandleError(err)
 				L.Push(lua.LString(s))
 			}
 			return 1
@@ -233,7 +235,7 @@ func uniqueHeader(xs []string) []string {
 	return rs
 }
 
-func (e *Encodings) FromCSV(L *lua.LState) int {
+func (e Encodings) FromCSV(L *lua.LState) int {
 	var r io.Reader
 
 	switch x := L.Get(1).(type) {
@@ -273,7 +275,7 @@ func (e *Encodings) FromCSV(L *lua.LState) int {
 		if err == io.EOF {
 			return 0
 		}
-		(*Environment)(e).HandleError(err)
+		e.env.HandleError(err)
 
 		header = uniqueHeader(header)
 	}
@@ -284,7 +286,7 @@ func (e *Encodings) FromCSV(L *lua.LState) int {
 			L.Push(lua.LNil)
 			return 1
 		}
-		(*Environment)(e).HandleError(err)
+		e.env.HandleError(err)
 
 		tbl := L.NewTable()
 		if useHeader {
@@ -315,9 +317,9 @@ func (e *Encodings) FromCSV(L *lua.LState) int {
 }
 
 func RegisterEncodings(env *Environment) {
-	env.RegisterFunction("tojson", (*Encodings)(env).ToJSON)
-	env.RegisterFunction("fromjson", (*Encodings)(env).FromJSON)
+	env.RegisterFunction("tojson", Encodings{env}.ToJSON)
+	env.RegisterFunction("fromjson", Encodings{env}.FromJSON)
 
-	env.RegisterFunction("tocsv", (*Encodings)(env).ToCSV)
-	env.RegisterFunction("fromcsv", (*Encodings)(env).FromCSV)
+	env.RegisterFunction("tocsv", Encodings{env}.ToCSV)
+	env.RegisterFunction("fromcsv", Encodings{env}.FromCSV)
 }
