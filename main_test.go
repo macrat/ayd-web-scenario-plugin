@@ -16,6 +16,7 @@ func TestNormalizeURL(t *testing.T) {
 		{"web-scenario://localhost/path/to/script.lua", "web-scenario:/path/to/script.lua"},
 		{"_examples/github-status.lua", "web-scenario:_examples/github-status.lua"},
 		{"./_examples/github-status.lua", "web-scenario:./_examples/github-status.lua"},
+		{".\\_examples\\github-status.lua", "web-scenario:./_examples/github-status.lua"},
 	}
 
 	for _, tt := range tests {

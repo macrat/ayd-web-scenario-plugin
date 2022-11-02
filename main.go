@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"runtime/pprof"
 	"time"
 
@@ -29,6 +30,7 @@ func ParseTargetURL(s string) (*ayd.URL, error) {
 		u.Path = ""
 	}
 	u.Host = ""
+	u.Opaque = filepath.ToSlash(u.Opaque)
 	return u, nil
 }
 
