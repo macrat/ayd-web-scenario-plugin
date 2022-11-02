@@ -128,13 +128,13 @@ func TestRun(t *testing.T) {
 	}
 
 	t.Run("timeout", func(t *testing.T) {
-		r := Run(&ayd.URL{Scheme: "web-scenario", Opaque: "./testdata/_timeout-test.lua"}, 100*time.Millisecond, false, false)
+		r := Run(&ayd.URL{Scheme: "web-scenario", Opaque: "./testdata/_timeout-test.lua"}, 500*time.Millisecond, false, false)
 
 		if r.Status != ayd.StatusAborted {
 			t.Errorf("expected ABORTED status but got %s", r.Status)
 		}
 
-		if r.Latency > 500*time.Millisecond {
+		if r.Latency > 1*time.Second {
 			t.Errorf("unexpected latency: %s", r.Latency)
 		}
 

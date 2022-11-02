@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -150,6 +151,7 @@ func (w *DebugWriter) Write(b []byte) (int, error) {
 
 func Test_testSenarios(t *testing.T) {
 	t.Setenv("TZ", "UTC")
+	t.Setenv("PATH", "./testdata/windows-compat"+string(os.PathListSeparator)+os.Getenv("PATH"))
 
 	files, err := filepath.Glob("testdata/*.lua")
 	if err != nil {

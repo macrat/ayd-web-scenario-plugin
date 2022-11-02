@@ -1,3 +1,6 @@
+package.path = package.path .. ";./testdata/?.lua"
+storage = require("utils/storage")
+
 t1 = tab.new(TEST.url("/download"))
 t2 = tab.new(TEST.url("/download"))
 
@@ -23,6 +26,8 @@ while download_count < 2 do
 end
 
 assert.eq(download_count, 2)
-assert.eq(io.popen("dir " .. TEST.storage()):read(), "data.txt")
+assert.eq(string.gsub(io.popen("ls " .. TEST.storage()):read("*a"), "\r\n", "\n"), "data.txt\n")
 
-assert.eq(io.input(TEST.storage("data.txt")):read(), "this is a data")
+f = io.input(TEST.storage("data.txt"))
+assert.eq(f:read("*a"), "this is a data")
+f:close()
