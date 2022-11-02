@@ -353,7 +353,7 @@ Pause program for specified `milliseconds`.
 
 It's highly recommended to use [`tab:wait()`](#tabwaitquery) method if possible, for execution speed and stability reasons.
 
-#### `time.millisecond` / `time.second` / `time.minute` / `time.hour`
+#### `time.millisecond` / `time.second` / `time.minute` / `time.hour` / `time.day` / `time.year`
 
 Helper numbers to build a time in milliseconds.
 
@@ -361,9 +361,10 @@ Helper numbers to build a time in milliseconds.
 time.sleep(0.5*time.hour + 10*time.second)  -- Wait for a half hour and 10 seconds.
 ```
 
-#### `time.format(millisecond)`
+#### `time.format(millisecond, [format])`
 
-Convert a `millisecond` number to `YYYY-mm-dd"T"HH:MM:ssZ` formatted string aka RFC3339 format.
+Convert a `millisecond` number to a human readable string.
+The default `format` is `"%Y-%m-%dT%H:%M:%S%z"` aka RFC3339 format.
 
 
 Encoding

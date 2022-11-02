@@ -39,13 +39,23 @@ func RegisterTime(ctx context.Context, env *Environment) {
 		},
 		"format": func(L *lua.LState) int {
 			env.Yield()
-			L.Push(lua.LString(time.UnixMilli(int64(L.CheckNumber(1))).Format(time.RFC3339)))
+
+			n := L.CheckNumber(1)
+			format := L.OptString(2, "%Y-%m-%dT%H:%M:%S%z")
+
+			L.Push(L.GetField(L.GetGlobal("os"), "date"))
+			L.Push(lua.LString(format))
+			L.Push(lua.LNumber(n / 1000))
+			L.Call(2, 1)
 			return 1
 		},
 	}, map[string]lua.LValue{
 		"millisecond": lua.LNumber(1),
 		"second":      lua.LNumber(1000),
-		"minute":      lua.LNumber(60 * 1000),
-		"hour":        lua.LNumber(60 * 60 * 1000),
+		"minute":      lua.LNumber(1000 * 60),
+		"hour":        lua.LNumber(1000 * 60 * 60),
+		"day":         lua.LNumber(1000 * 60 * 60 * 24),
+		"week":        lua.LNumber(1000 * 60 * 60 * 24 * 7),
+		"year":        lua.LNumber(1000 * 60 * 60 * 24 * 7 * 365),
 	})
 }
