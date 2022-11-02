@@ -372,21 +372,21 @@ Encoding
 
 ### JSON ###
 
-#### `fromjson(s)`
+#### `fromjson(json)`
 
-Parse JSON string `s`.
+Parse `json` string.
 
-#### `tojson(v)`
+#### `tojson(value)`
 
-Encode `v` into JSON string.
+Encode `value` into JSON string.
 
 
 ### CSV ###
 
-#### `fromcsv(values, [useheader])`
+#### `fromcsv(csv, [useheader])`
 
-Parse CSV `values` and make an iterator function.
-The parameter `values` can be a string, a list table, or an iterator function that returns strings.
+Parse `csv` and make an iterator function.
+The parameter `csv` can be a string, a list table, or an iterator function that returns strings.
 
 In default, the first row is used as the header, and each results will be key-value style.
 If the parameter `useheader` is `false`, this function does not use the first row as header and each results will be a list style.
@@ -439,3 +439,39 @@ world,bar
 number,indexed
 you can,combine
 ```
+
+
+### XML ###
+
+#### `fromxml(xml)`
+
+Parse `xml` as a XML and returns a table.
+The parameter `xml` can be a string, a list table, or an iterator function that returns strings.
+
+``` lua
+assert.eq(
+  fromxml([[
+    <feed xmlns="http://www.w3.org/2005/Atom">
+      <title>foobar</title>
+      <link href="https://example.com" />
+    </feed>
+  ]]),
+
+  {"feed", xmlns="http://www.w3.org/2005/Atom"
+    {"title",
+      "foobar"
+    },
+    {"link", href="https://example.com"}
+  }
+)
+```
+
+#### `toxml(table)`
+
+Encode a `table` as a XML string.
+
+The `table[1]` is used as a tag name.
+Second or later elements is used as children of the tag.
+Other properties named by string is used as attributes.
+
+Please see also the example for [`fromxml`](#fromxmlxml).

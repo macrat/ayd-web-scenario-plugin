@@ -3,6 +3,7 @@ package webscenario
 import (
 	"encoding/csv"
 	"encoding/json"
+	"encoding/xml"
 	"fmt"
 	"io"
 	"sort"
@@ -204,6 +205,31 @@ func (ir *iterReader) Read(p []byte) (n int, err error) {
 	return
 }
 
+func checkReader(L *lua.LState, index int) io.Reader {
+	var r io.Reader
+
+	switch x := L.Get(index).(type) {
+	case lua.LString:
+		r = strings.NewReader(string(x))
+	case *lua.LTable:
+		r = &iterReader{
+			Fn: iiter(x),
+		}
+	case *lua.LFunction:
+		r = &iterReader{
+			Fn: func() lua.LValue {
+				L.Push(x)
+				L.Call(0, 1)
+				return L.Get(-1)
+			},
+		}
+	default:
+		L.ArgError(1, "string, table, or iterator function expected.")
+	}
+
+	return r
+}
+
 func uniqueHeader(xs []string) []string {
 	contains := func(x string, xs []string) bool {
 		for _, y := range xs {
@@ -236,26 +262,7 @@ func uniqueHeader(xs []string) []string {
 }
 
 func (e Encodings) FromCSV(L *lua.LState) int {
-	var r io.Reader
-
-	switch x := L.Get(1).(type) {
-	case lua.LString:
-		r = strings.NewReader(string(x))
-	case *lua.LTable:
-		r = &iterReader{
-			Fn: iiter(x),
-		}
-	case *lua.LFunction:
-		r = &iterReader{
-			Fn: func() lua.LValue {
-				L.Push(x)
-				L.Call(0, 1)
-				return L.Get(-1)
-			},
-		}
-	default:
-		L.ArgError(1, "string, table, or iterator function expected.")
-	}
+	r := checkReader(L, 1)
 
 	useHeader := true
 	switch x := L.Get(2).(type) {
@@ -316,10 +323,133 @@ func (e Encodings) FromCSV(L *lua.LState) int {
 	}
 }
 
+func encodeXML(enc *xml.Encoder, L *lua.LState, t *lua.LTable) {
+	k, v := t.Next(lua.LNil)
+	kn, kok := k.(lua.LNumber)
+	vs, vok := v.(lua.LString)
+	if !kok || kn != 1 || !vok || vs == "" {
+		L.RaiseError("the first element of table should be a string.")
+	}
+
+	start := xml.StartElement{Name: xml.Name{Local: string(vs)}}
+	end := xml.EndElement{Name: xml.Name{Local: string(vs)}}
+
+	var children []lua.LValue
+	for {
+		k, v = t.Next(k)
+		if v.Type() == lua.LTNil {
+			break
+		}
+		if _, ok := k.(lua.LNumber); ok {
+			children = append(children, v)
+		} else {
+			start.Attr = append(start.Attr, xml.Attr{
+				Name:  xml.Name{Local: lua.LVAsString(k)},
+				Value: lua.LVAsString(v),
+			})
+		}
+	}
+
+	encode := func(t xml.Token) {
+		err := enc.EncodeToken(t)
+		if err != nil {
+			L.RaiseError("%s", err)
+		}
+	}
+
+	encode(start)
+
+	for _, child := range children {
+		switch v := child.(type) {
+		case *lua.LNilType:
+		case *lua.LTable:
+			encodeXML(enc, L, v)
+		case lua.LString:
+			encode(xml.CharData(v))
+		default:
+			encode(xml.CharData(LValueToString(v)))
+		}
+	}
+
+	encode(end)
+}
+
+func (e Encodings) ToXML(L *lua.LState) int {
+	var b strings.Builder
+
+	enc := xml.NewEncoder(&b)
+	encodeXML(enc, L, L.CheckTable(1))
+	e.env.HandleError(enc.Flush())
+
+	L.Push(lua.LString(b.String()))
+	return 1
+}
+
+func decodeXML(dec *xml.Decoder, start xml.StartElement, L *lua.LState) *lua.LTable {
+	tbl := L.NewTable()
+
+	tbl.Append(lua.LString(start.Name.Local))
+
+	for _, attr := range start.Attr {
+		L.SetField(tbl, attr.Name.Local, lua.LString(attr.Value))
+	}
+
+	for {
+		tok, err := dec.Token()
+		if err == io.EOF {
+			return tbl
+		} else if err != nil {
+			L.RaiseError("%s", err)
+		}
+
+		switch t := tok.(type) {
+		case xml.StartElement:
+			tbl.Append(decodeXML(dec, t, L))
+		case xml.EndElement:
+			return tbl
+		case xml.CharData:
+			s := strings.TrimSpace(string(t))
+			if s != "" {
+				tbl.Append(lua.LString(s))
+			}
+		case xml.Directive:
+			if strings.HasPrefix(string(t), "[CDATA[") && strings.HasSuffix(string(t), "]]") {
+				s := string(t[len("[CDATA["):])
+				tbl.Append(lua.LString(s[:len(s)-1]))
+			}
+		}
+	}
+}
+
+func (e Encodings) FromXML(L *lua.LState) int {
+	r := checkReader(L, 1)
+	dec := xml.NewDecoder(r)
+
+	for {
+		tok, err := dec.Token()
+		if err == io.EOF {
+			L.Push(lua.LNil)
+			return 1
+		}
+		e.env.HandleError(err)
+
+		if start, ok := tok.(xml.StartElement); ok {
+			tbl := decodeXML(dec, start, L)
+			L.Push(tbl)
+			break
+		}
+	}
+
+	return 1
+}
+
 func RegisterEncodings(env *Environment) {
 	env.RegisterFunction("tojson", Encodings{env}.ToJSON)
 	env.RegisterFunction("fromjson", Encodings{env}.FromJSON)
 
 	env.RegisterFunction("tocsv", Encodings{env}.ToCSV)
 	env.RegisterFunction("fromcsv", Encodings{env}.FromCSV)
+
+	env.RegisterFunction("toxml", Encodings{env}.ToXML)
+	env.RegisterFunction("fromxml", Encodings{env}.FromXML)
 }
