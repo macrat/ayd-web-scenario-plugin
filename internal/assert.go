@@ -61,7 +61,7 @@ func RegisterAssert(L *lua.LState) {
 			if !L.ToBool(2) {
 				L.RaiseError("%s", L.OptString(3, "assertion failed!"))
 			}
-			return 0
+			return L.GetTop() - 1
 		},
 		"__tostring": func(L *lua.LState) int {
 			L.Push(lua.LString("assert"))
