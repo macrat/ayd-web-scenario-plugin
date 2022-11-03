@@ -35,9 +35,9 @@ If `option` is a table, this function uses below properties.
 
 Close the tab.
 
-#### `tab.viewport` / `tab:setViewport(width, height)`
+#### `tab.viewport`
 
-Get or set the tab's viewport.
+Get the tab's viewport as a table which has `width` and `height` property.
 
 
 ### Navigate ###
@@ -83,7 +83,7 @@ This method never raise an error even if there is no element to match to the `qu
 
 Get [element](#element)s table using a XPath `query`.
 
-The result of this method is a table of [element](#element)s with the same metatable with [`tab:all(query)`](#taballquery)'s one.
+The result of this method is a table of [element](#element)s with the same metatable with [`tab:all()`](#taballquery)'s one.
 
 #### `tab:wait(query, [timeout])`
 
@@ -110,10 +110,6 @@ If you want a full page screenshot, you can use [`tab("body"):screenshot()`](#el
 
 The `name` argument will be used as the file name of screenshot file.
 If the `name` omitted, file name will be determined automatically by a serial number.
-
-#### `tab:recording(bool)`
-
-Enable or disable animated GIF recording.
 
 
 ### Execute JavaScript ###
@@ -152,17 +148,17 @@ end)
 #### `tab:waitDialog([timeout])`
 
 Wait for a dialog shown until `timeout` in millisecond.
-It can receive dialogs already shown but not waited yet, unlike [`tab:onDialog`](#tabondialogcallback).
+It can receive dialogs already shown but not waited yet, unlike [`tab:onDialog()`](#tabondialogcallback).
 But this function just receive information and can do nothing to the dialog.
 
 This method returns two values.
 The first one is `tab` itself for using method chain.
-The second one is information of dialog, that is the same as [`tab:onDialog`](#tabondialogcallback)'s argument.
+The second one is information of dialog, that is the same as [`tab:onDialog()`](#tabondialogcallback)'s argument.
 
 #### `tab.dialogs`
 
 Get a dialog list that shown in the tab.
-Please see also [`tab:onDialog`](#tabondialogcallback)
+Please see also [`tab:onDialog()`](#tabondialogcallback)
 
 #### `tab:onDownload([callback])`
 
@@ -180,16 +176,16 @@ end)
 #### `tab:waitDownload([timeout])`
 
 Wait for a file downloaded until `timeout` in millisecond.
-It can receive downloads already done but not waited yet, unlike [`tab:onDownload`](#tabondownloadcallback).
+It can receive downloads already done but not waited yet, unlike [`tab:onDownload()`](#tabondownloadcallback).
 
 This method returns two values.
 The first one is `tab` itself for using method chain.
-The second one is information of downloaded file, that is the same as [`tab:onDownload`](#tabdownloadcallback)'s argument.
+The second one is information of downloaded file, that is the same as [`tab:onDownload()`](#tabdownloadcallback)'s argument.
 
 #### `tab.downloads`
 
 Get a file list that downloaded from the tab.
-Please see also [`tab:onDownloaded`](#tabondownloadcallback)
+Please see also [`tab:onDownloaded()`](#tabondownloadcallback)
 
 #### `tab:onRequest(callback)`
 
@@ -210,16 +206,16 @@ end)
 #### `tab:waitRequest([timeout])`
 
 Wait for a network request until `timeout` in millisecond.
-It can receive request already done but not waited yet, unlike [`tab:onRequest`](#tabonrequestcallback).
+It can receive request already done but not waited yet, unlike [`tab:onRequest()`](#tabonrequestcallback).
 
 This method returns two values.
 The first one is `tab` itself for using method chain.
-The second one is information of the request, that is the same as [`tab:onRequest`](#tabonrequestcallback)'s argument.
+The second one is information of the request, that is the same as [`tab:onRequest()`](#tabonrequestcallback)'s argument.
 
 #### `tab.requests`
 
 Get a request list that sent from the tab.
-Please see also [`tab:onRequest`](#tabonrequestcallback)
+Please see also [`tab:onRequest()`](#tabonrequestcallback)
 
 #### `tab:onResponse(callback)`
 
@@ -247,16 +243,16 @@ end)
 #### `tab:waitResponse([timeout])`
 
 Wait for a network response received until `timeout` in millisecond.
-It can receive response already done but not waited yet, unlike [`tab:onResponse`](#tabonresponsecallback).
+It can receive response already done but not waited yet, unlike [`tab:onResponse()`](#tabonresponsecallback).
 
 This method returns two values.
 The first one is `tab` itself for using method chain.
-The second one is information of the response, that is the same as [`tab:onResponse`](#tabonresponsecallback)'s argument.
+The second one is information of the response, that is the same as [`tab:onResponse()`](#tabonresponsecallback)'s argument.
 
 #### `tab.responses`
 
 Get a response list that the tab received.
-Please see also [`tab:onResponse`](#tabonresponsecallback)
+Please see also [`tab:onResponse()`](#tabonresponsecallback)
 
 
 Element
