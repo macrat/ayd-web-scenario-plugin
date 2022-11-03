@@ -35,9 +35,12 @@ func ParseTargetURL(s string) (*ayd.URL, error) {
 }
 
 func main() {
+	var opts webscenario.Options
+
 	flags := pflag.NewFlagSet("ayd-web-scenario-plugin", pflag.ContinueOnError)
-	debugMode := flags.Bool("debug", false, "enable debug mode.")
-	enableRecording := flags.Bool("gif", false, "enable recording animation gif.")
+	flags.BoolVar(&opts.Debug, "debug", false, "enable debug mode.")
+	flags.BoolVar(&opts.Head, "head", false, "show browser window while execution.")
+	flags.BoolVar(&opts.Recording, "gif", false, "enable recording animation gif.")
 	showVersion := flags.BoolP("version", "v", false, "show version and exit.")
 	showHelp := flags.BoolP("help", "h", false, "show help message and exit.")
 
@@ -71,13 +74,15 @@ func main() {
 		defer pprof.StopCPUProfile()
 	}
 
-	target, err := ParseTargetURL(flags.Arg(0))
+	var err error
+	opts.Target, err = ParseTargetURL(flags.Arg(0))
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		fmt.Fprintf(os.Stderr, "\nPlease see `%s -h` for more information.\n", os.Args[0])
 		os.Exit(2)
 	}
 
-	rec := webscenario.Run(target, 50*time.Minute, *debugMode, *enableRecording)
-	ayd.NewLogger(target).Print(rec)
+	opts.Timeout = 50 * time.Minute
+	rec := webscenario.Run(opts)
+	ayd.NewLogger(opts.Target).Print(rec)
 }

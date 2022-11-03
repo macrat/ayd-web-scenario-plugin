@@ -13,10 +13,44 @@ import (
 	"github.com/yuin/gopher-lua"
 )
 
-func NewContext(timeout time.Duration, debuglog *ayd.Logger) (context.Context, context.CancelFunc) {
+func NewExecAllocator(ctx context.Context, withHead bool) (context.Context, context.CancelFunc) {
+	opts := []chromedp.ExecAllocatorOption{
+		chromedp.NoFirstRun,
+		chromedp.NoDefaultBrowserCheck,
+
+		chromedp.Flag("disable-background-networking", true),
+		chromedp.Flag("enable-features", "NetworkService,NetworkServiceInProcess"),
+		chromedp.Flag("disable-background-timer-throttling", true),
+		chromedp.Flag("disable-backgrounding-occluded-windows", true),
+		chromedp.Flag("disable-breakpad", true),
+		chromedp.Flag("disable-client-side-phishing-detection", true),
+		chromedp.Flag("disable-default-apps", true),
+		chromedp.Flag("disable-dev-shm-usage", true),
+		chromedp.Flag("disable-extensions", true),
+		chromedp.Flag("disable-features", "site-per-process,Translate,BlinkGenPropertyTrees"),
+		chromedp.Flag("disable-hang-monitor", true),
+		chromedp.Flag("disable-ipc-flooding-protection", true),
+		chromedp.Flag("disable-popup-blocking", true),
+		chromedp.Flag("disable-prompt-on-repost", true),
+		chromedp.Flag("disable-renderer-backgrounding", true),
+		chromedp.Flag("disable-sync", true),
+		chromedp.Flag("force-color-profile", "srgb"),
+		chromedp.Flag("metrics-recording-only", true),
+		chromedp.Flag("safebrowsing-disable-auto-update", true),
+		chromedp.Flag("enable-automation", true),
+		chromedp.Flag("password-store", "basic"),
+		chromedp.Flag("use-mock-keychain", true),
+	}
+	if !withHead {
+		opts = append(opts, chromedp.Headless)
+	}
+	return chromedp.NewExecAllocator(ctx, opts...)
+}
+
+func NewContext(timeout time.Duration, withHead bool, debuglog *ayd.Logger) (context.Context, context.CancelFunc) {
 	ctx, stopTimeout := context.WithTimeout(context.Background(), timeout)
 	ctx, stopNotify := signal.NotifyContext(ctx, os.Interrupt)
-	ctx, stopAllocator := chromedp.NewExecAllocator(ctx, chromedp.DefaultExecAllocatorOptions[:]...)
+	ctx, stopAllocator := NewExecAllocator(ctx, withHead)
 
 	var opts []chromedp.ContextOption
 	if debuglog != nil {
@@ -49,16 +83,24 @@ func NewContext(timeout time.Duration, debuglog *ayd.Logger) (context.Context, c
 	}
 }
 
-func Run(target *ayd.URL, timeout time.Duration, debug bool, enableRecording bool) ayd.Record {
+type Options struct {
+	Target    *ayd.URL
+	Timeout   time.Duration
+	Debug     bool
+	Head      bool
+	Recording bool
+}
+
+func Run(opt Options) ayd.Record {
 	timestamp := time.Now()
 
 	logger := &Logger{Status: ayd.StatusHealthy}
-	if debug {
+	if opt.Debug {
 		logger.DebugOut = os.Stderr
 	}
 
 	baseDir := os.Getenv("WEBSCENARIO_ARTIFACT_DIR")
-	storage, err := NewStorage(baseDir, target.Opaque, timestamp)
+	storage, err := NewStorage(baseDir, opt.Target.Opaque, timestamp)
 	if err != nil {
 		return ayd.Record{
 			Time:    timestamp,
@@ -68,7 +110,7 @@ func Run(target *ayd.URL, timeout time.Duration, debug bool, enableRecording boo
 	}
 
 	var browserlog *ayd.Logger
-	if debug {
+	if opt.Debug {
 		f, err := storage.Open("browser.log")
 		if err != nil {
 			return ayd.Record{
@@ -78,18 +120,18 @@ func Run(target *ayd.URL, timeout time.Duration, debug bool, enableRecording boo
 			}
 		}
 		defer f.Close()
-		l := ayd.NewLoggerWithWriter(f, target)
+		l := ayd.NewLoggerWithWriter(f, opt.Target)
 		browserlog = &l
 	}
 
-	ctx, cancel := NewContext(timeout, browserlog)
+	ctx, cancel := NewContext(opt.Timeout, opt.Head, browserlog)
 	defer cancel()
 
 	env := NewEnvironment(ctx, logger, storage)
-	env.EnableRecording = enableRecording
+	env.EnableRecording = opt.Recording
 
 	stime := time.Now()
-	err = env.DoFile(target.Opaque)
+	err = env.DoFile(opt.Target.Opaque)
 	latency := time.Since(stime)
 
 	env.Close()

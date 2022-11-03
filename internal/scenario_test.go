@@ -165,7 +165,7 @@ func Test_testSenarios(t *testing.T) {
 	server := StartTestServer()
 	t.Cleanup(server.Close)
 
-	ctx, cancel := NewContext(5*time.Minute, nil)
+	ctx, cancel := NewContext(5*time.Minute, false, nil)
 	t.Cleanup(cancel)
 
 	for _, p := range files {
