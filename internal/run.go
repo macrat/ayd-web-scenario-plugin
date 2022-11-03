@@ -13,7 +13,11 @@ import (
 	"github.com/yuin/gopher-lua"
 )
 
-func StartBrowser(ctx context.Context, debuglog *ayd.Logger) (context.Context, context.CancelFunc) {
+func NewContext(timeout time.Duration, debuglog *ayd.Logger) (context.Context, context.CancelFunc) {
+	ctx, stopTimeout := context.WithTimeout(context.Background(), timeout)
+	ctx, stopNotify := signal.NotifyContext(ctx, os.Interrupt)
+	ctx, stopAllocator := chromedp.NewExecAllocator(ctx, chromedp.DefaultExecAllocatorOptions[:]...)
+
 	var opts []chromedp.ContextOption
 	if debuglog != nil {
 		opts = append(
@@ -35,16 +39,7 @@ func StartBrowser(ctx context.Context, debuglog *ayd.Logger) (context.Context, c
 			}),
 		)
 	}
-	ctx, cancel := chromedp.NewContext(ctx, opts...)
-	chromedp.Run(ctx)
-	return ctx, cancel
-}
-
-func NewContext(timeout time.Duration, debuglog *ayd.Logger) (context.Context, context.CancelFunc) {
-	ctx, stopTimeout := context.WithTimeout(context.Background(), timeout)
-	ctx, stopNotify := signal.NotifyContext(ctx, os.Interrupt)
-	ctx, stopAllocator := chromedp.NewExecAllocator(ctx, chromedp.DefaultExecAllocatorOptions[:]...)
-	ctx, stopBrowser := StartBrowser(ctx, debuglog)
+	ctx, stopBrowser := chromedp.NewContext(ctx, opts...)
 
 	return ctx, func() {
 		stopBrowser()

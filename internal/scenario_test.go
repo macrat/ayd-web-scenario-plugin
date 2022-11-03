@@ -165,6 +165,9 @@ func Test_testSenarios(t *testing.T) {
 	server := StartTestServer()
 	t.Cleanup(server.Close)
 
+	ctx, cancel := NewContext(5*time.Minute, nil)
+	t.Cleanup(cancel)
+
 	for _, p := range files {
 		p := p
 		b := filepath.Base(p)
@@ -173,9 +176,6 @@ func Test_testSenarios(t *testing.T) {
 		}
 		t.Run(b, func(t *testing.T) {
 			t.Parallel()
-
-			ctx, cancel := NewContext(1*time.Minute, nil)
-			defer cancel()
 
 			s, err := NewStorage(t.TempDir(), p, time.Now())
 			if err != nil {
