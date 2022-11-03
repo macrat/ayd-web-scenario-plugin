@@ -55,6 +55,19 @@ func (s *Storage) Open(name string) (*os.File, error) {
 	return os.OpenFile(p, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0640)
 }
 
+func (s *Storage) Remove(path string) {
+	s.Lock()
+	for i, p := range s.artifacts {
+		if p == path {
+			s.artifacts = append(s.artifacts[:i], s.artifacts[i+1:]...)
+			s.Unlock()
+			os.Remove(path)
+			return
+		}
+	}
+	s.Unlock()
+}
+
 func (s *Storage) Save(name, ext string, data []byte) error {
 	s.Lock()
 

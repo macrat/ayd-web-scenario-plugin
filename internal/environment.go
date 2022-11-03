@@ -129,8 +129,11 @@ func (env *Environment) saveRecord(recorder *Recorder) {
 	go func(id int64) {
 		<-recorder.Done
 		if f, err := env.storage.Open(fmt.Sprintf("record-%04d.gif", id)); err == nil {
-			defer f.Close()
-			recorder.SaveTo(f)
+			err = recorder.SaveTo(f)
+			f.Close()
+			if err == NoRecord {
+				env.storage.Remove(f.Name())
+			}
 		}
 		env.saveWG.Done()
 	}(id)

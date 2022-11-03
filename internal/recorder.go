@@ -3,11 +3,12 @@ package webscenario
 import (
 	"bytes"
 	"context"
+	"errors"
 	"image"
 	"image/color"
 	"image/color/palette"
 	"image/gif"
-	"image/jpeg"
+	"image/png"
 	"io"
 	"os"
 	"strconv"
@@ -21,9 +22,12 @@ import (
 )
 
 const (
-	SourceWidth  = 1280 - 1280*480/720
-	RecordHeight = 480
-	LineHeight   = 20
+	SourceWidth = 600
+	LineHeight  = 20
+)
+
+var (
+	NoRecord = errors.New("no record")
 )
 
 var (
@@ -40,21 +44,25 @@ type Recorder struct {
 	ch     chan<- recorderTask
 	stop   context.CancelFunc
 
+	width, height int
+
 	Done chan struct{}
 }
 
-func NewRecorder(ctx context.Context) *Recorder {
+func NewRecorder(ctx context.Context, width, height int) *Recorder {
 	ch := make(chan recorderTask, 8)
 
 	ctx, cancel := context.WithCancel(ctx)
 
 	rec := &Recorder{
-		ch:   ch,
-		stop: cancel,
-		Done: make(chan struct{}),
+		ch:     ch,
+		stop:   cancel,
+		width:  width,
+		height: height,
+		Done:   make(chan struct{}),
 	}
 
-	go rec.runRecorder(ch)
+	go rec.runRecorder(ch, width, height)
 	go func() {
 		<-ctx.Done()
 		close(ch)
@@ -73,39 +81,26 @@ func parseWhere(where string) (string, int) {
 	return where[:pos], line
 }
 
-func (r *Recorder) runRecorder(ch <-chan recorderTask) {
-	buf := image.NewRGBA(image.Rect(0, 0, 900, RecordHeight))
+func (r *Recorder) runRecorder(ch <-chan recorderTask, width, height int) {
+	screenSize := image.Rect(0, 0, width, height)
+	recordSize := image.Rect(0, 0, width+SourceWidth, height)
 
 	for task := range ch {
-		orig, err := jpeg.Decode(bytes.NewReader(*task.Screenshot))
+		orig, err := png.Decode(bytes.NewReader(*task.Screenshot))
 		if err != nil {
 			// TODO: add error handling
 			continue
 		}
-		size := orig.Bounds().Max
 
-		bounds := image.Rect(0, 0, size.X*RecordHeight/size.Y, RecordHeight)
-		if buf.Bounds().Max.X < bounds.Max.X {
-			buf = image.NewRGBA(bounds)
-		}
-		draw.Draw(buf, bounds, orig, image.ZP, draw.Src)
-		draw.ApproxBiLinear.Scale(buf, bounds, orig, orig.Bounds(), draw.Src, nil)
-
-		img := image.NewPaletted(image.Rect(0, 0, bounds.Max.X+SourceWidth, RecordHeight), Palette)
-		draw.FloydSteinberg.Draw(img, bounds, buf, image.ZP)
+		img := image.NewPaletted(recordSize, Palette)
+		draw.FloydSteinberg.Draw(img, screenSize, orig, image.ZP)
 
 		where, line := parseWhere(task.Where)
-		sourceImager.LoadAsImage(img, image.Rect(bounds.Max.X, 0, img.Bounds().Max.X, RecordHeight), where, line)
+		sourceImager.LoadAsImage(img, image.Rect(width, 0, recordSize.Max.X, height), where, line)
 
 		r.images = append(r.images, img)
 	}
 	close(r.Done)
-}
-
-func (r *Recorder) Close() error {
-	r.stop()
-	<-r.Done
-	return nil
 }
 
 type RecordAction struct {
@@ -152,37 +147,19 @@ func copyImage(dst, src *image.Paletted, rect image.Rectangle, offset image.Poin
 }
 
 func (r *Recorder) SaveTo(f io.Writer) error {
-	maxWidth := 0
-	for _, img := range r.images {
-		x := img.Bounds().Max.X - SourceWidth
-		if maxWidth < x {
-			maxWidth = x
-		}
+	if len(r.images) == 0 {
+		return NoRecord
 	}
 
-	var images []*image.Paletted
-	for _, img := range r.images {
-		if img.Bounds().Max.X == maxWidth+SourceWidth {
-			images = append(images, img)
-		} else {
-			dst := image.NewPaletted(image.Rect(0, 0, maxWidth+SourceWidth, RecordHeight), Palette)
-			screenWidth := img.Bounds().Max.X - SourceWidth
-			margin := (maxWidth - screenWidth) / 2
-			copyImage(dst, img, image.Rect(0, 0, screenWidth, RecordHeight), image.Point{margin, 0})
-			copyImage(dst, img, image.Rect(screenWidth, 0, img.Bounds().Max.X, RecordHeight), image.Point{maxWidth - screenWidth, 0})
-			images = append(images, dst)
-		}
-	}
-
-	compressGif(images)
+	compressGif(r.images)
 
 	g := gif.GIF{
-		Image: images,
+		Image: r.images,
 	}
 	for range g.Image {
-		g.Delay = append(g.Delay, 100)
+		g.Delay = append(g.Delay, 200)
 	}
-	g.Delay[len(g.Delay)-1] = 500
+	g.Delay[len(g.Delay)-1] = 400
 
 	return gif.EncodeAll(f, &g)
 }
@@ -246,13 +223,13 @@ func (s *SourceImager) LoadAsImage(img *image.Paletted, rect image.Rectangle, pa
 		Face: s.face,
 	}
 
-	offset := line + 3 - RecordHeight/LineHeight
+	offset := line + 3 - rect.Bounds().Max.Y/LineHeight
 	if offset < 1 {
 		offset = 1
 	}
 
 	for i, l := range lines[offset-1:] {
-		if i > RecordHeight/LineHeight {
+		if i > rect.Bounds().Max.Y/LineHeight {
 			break
 		}
 

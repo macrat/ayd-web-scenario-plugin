@@ -108,7 +108,7 @@ func NewTab(ctx context.Context, L *lua.LState, env *Environment) *Tab {
 	})
 
 	if recording || env.EnableRecording {
-		t.recorder = NewRecorder(t.ctx)
+		t.recorder = NewRecorder(t.ctx, int(width), int(height))
 	}
 
 	if url != "" {
@@ -216,8 +216,7 @@ func captureScreenshotForRecording(buf *[]byte) chromedp.ActionFunc {
 		var err error
 		*buf, err = page.CaptureScreenshot().
 			WithCaptureBeyondViewport(true).
-			WithFormat(page.CaptureScreenshotFormatJpeg).
-			WithQuality(70).
+			WithFormat(page.CaptureScreenshotFormatPng).
 			WithOptimizeForSpeed(true).
 			Do(ctx)
 		return err
@@ -250,19 +249,12 @@ func (t *Tab) Run(L *lua.LState, taskName string, capture bool, action ...chrome
 
 	err := AsyncRun(t.env, func() error {
 		if capture && t.recorder != nil {
-			var before, after []byte
+			var buf []byte
 
 			action = append(
-				[]chromedp.Action{
-					captureScreenshotForRecording(&before),
-					t.recorder.Record(where, &before),
-				},
-				action...,
-			)
-			action = append(
 				action,
-				captureScreenshotForRecording(&after),
-				t.recorder.Record(where, &after),
+				captureScreenshotForRecording(&buf),
+				t.recorder.Record(where, &buf),
 			)
 		}
 		return chromedp.Run(t.ctx, action...)
