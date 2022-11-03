@@ -88,6 +88,13 @@ func AsyncRun[T any](env *Environment, f func() T) T {
 	return f()
 }
 
+// SyncRun makes environment that can call lua function safe inside of AsyncRun.
+func SyncRun[T any](env *Environment, f func(L *lua.LState) T) T {
+	env.Lock()
+	defer env.Unlock()
+	return f(env.lua)
+}
+
 // CallEventHandler calls an event callback function with GIL.
 func (env *Environment) CallEventHandler(f *lua.LFunction, arg *lua.LTable, nret int) []lua.LValue {
 	env.Lock()

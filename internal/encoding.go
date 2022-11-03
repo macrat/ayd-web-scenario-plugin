@@ -4,6 +4,7 @@ import (
 	"encoding/csv"
 	"encoding/json"
 	"encoding/xml"
+	"errors"
 	"fmt"
 	"io"
 	"sort"
@@ -17,15 +18,23 @@ type Encodings struct {
 }
 
 func (e Encodings) ToJSON(L *lua.LState) int {
-	bs, err := json.Marshal(UnpackLValue(L.Get(1)))
-	e.env.HandleError(err)
-	L.Push(lua.LString(string(bs)))
+	v := L.Get(1)
+	s := AsyncRun(e.env, func() string {
+		bs, err := json.Marshal(UnpackLValue(v))
+		e.env.HandleError(err)
+		return string(bs)
+	})
+	L.Push(lua.LString(s))
 	return 1
 }
 
 func (e Encodings) FromJSON(L *lua.LState) int {
+	s := L.CheckString(1)
 	var v any
-	json.Unmarshal([]byte(L.CheckString(1)), &v)
+	AsyncRun(e.env, func() struct{} {
+		json.Unmarshal([]byte(s), &v)
+		return struct{}{}
+	})
 	L.Push(PackLValue(L, v))
 	return 1
 }
@@ -117,6 +126,8 @@ func (e Encodings) ToCSV(L *lua.LState) int {
 	}
 
 	L.Push(L.NewFunction(func(L *lua.LState) int {
+		e.env.Yield()
+
 		if keep != nil {
 			s, err := stringsToCSV(keep)
 			e.env.HandleError(err)
@@ -288,6 +299,8 @@ func (e Encodings) FromCSV(L *lua.LState) int {
 	}
 
 	L.Push(L.NewFunction(func(L *lua.LState) int {
+		e.env.Yield()
+
 		xs, err := c.Read()
 		if err == io.EOF {
 			L.Push(lua.LNil)
@@ -323,12 +336,12 @@ func (e Encodings) FromCSV(L *lua.LState) int {
 	}
 }
 
-func encodeXML(enc *xml.Encoder, L *lua.LState, t *lua.LTable) {
+func encodeXML(enc *xml.Encoder, t *lua.LTable) {
 	k, v := t.Next(lua.LNil)
 	kn, kok := k.(lua.LNumber)
 	vs, vok := v.(lua.LString)
 	if !kok || kn != 1 || !vok || vs == "" {
-		L.RaiseError("the first element of table should be a string.")
+		panic(errors.New("the first element of table should be a string."))
 	}
 
 	start := xml.StartElement{Name: xml.Name{Local: string(vs)}}
@@ -353,7 +366,7 @@ func encodeXML(enc *xml.Encoder, L *lua.LState, t *lua.LTable) {
 	encode := func(t xml.Token) {
 		err := enc.EncodeToken(t)
 		if err != nil {
-			L.RaiseError("%s", err)
+			panic(err)
 		}
 	}
 
@@ -363,7 +376,7 @@ func encodeXML(enc *xml.Encoder, L *lua.LState, t *lua.LTable) {
 		switch v := child.(type) {
 		case *lua.LNilType:
 		case *lua.LTable:
-			encodeXML(enc, L, v)
+			encodeXML(enc, v)
 		case lua.LString:
 			encode(xml.CharData(v))
 		default:
@@ -375,11 +388,26 @@ func encodeXML(enc *xml.Encoder, L *lua.LState, t *lua.LTable) {
 }
 
 func (e Encodings) ToXML(L *lua.LState) int {
+	defer func() {
+		err := recover()
+		if err != nil {
+			L.RaiseError("%s", err)
+		}
+	}()
+
+	v := L.CheckTable(1)
+
 	var b strings.Builder
 
-	enc := xml.NewEncoder(&b)
-	encodeXML(enc, L, L.CheckTable(1))
-	e.env.HandleError(enc.Flush())
+	err := AsyncRun(e.env, func() error {
+		enc := xml.NewEncoder(&b)
+
+		encodeXML(enc, v)
+
+		return enc.Flush()
+	})
+
+	e.env.HandleError(err)
 
 	L.Push(lua.LString(b.String()))
 	return 1
@@ -422,6 +450,8 @@ func decodeXML(dec *xml.Decoder, start xml.StartElement, L *lua.LState) *lua.LTa
 }
 
 func (e Encodings) FromXML(L *lua.LState) int {
+	e.env.Yield()
+
 	r := checkReader(L, 1)
 	dec := xml.NewDecoder(r)
 
