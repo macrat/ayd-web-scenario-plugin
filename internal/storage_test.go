@@ -7,7 +7,7 @@ import (
 )
 
 func TestNewStorage(t *testing.T) {
-	t.Setenv("TZ", "UTC")
+	t.Parallel()
 
 	timestamp := time.Date(2022, 1, 2, 15, 4, 5, 0, time.UTC)
 	tmpdir := t.TempDir()

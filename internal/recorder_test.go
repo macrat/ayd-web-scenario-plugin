@@ -48,6 +48,8 @@ func Test_parseWhere(t *testing.T) {
 }
 
 func Test_compressGif(t *testing.T) {
+	t.Parallel()
+
 	loadGifs := func(path string) []*image.Paletted {
 		var imgs []*image.Paletted
 		for i := 0; i <= 6; i++ {

@@ -13,6 +13,11 @@ import (
 	"github.com/yuin/gopher-lua"
 )
 
+func init() {
+	os.Setenv("TZ", "UTC")
+	os.Setenv("PATH", "./testdata/windows-compat"+string(os.PathListSeparator)+os.Getenv("PATH"))
+}
+
 func StartTestServer() *httptest.Server {
 	mux := http.NewServeMux()
 
@@ -150,8 +155,7 @@ func (w *DebugWriter) Write(b []byte) (int, error) {
 }
 
 func Test_testSenarios(t *testing.T) {
-	t.Setenv("TZ", "UTC")
-	t.Setenv("PATH", "./testdata/windows-compat"+string(os.PathListSeparator)+os.Getenv("PATH"))
+	t.Parallel()
 
 	files, err := filepath.Glob("testdata/*.lua")
 	if err != nil {
@@ -159,17 +163,20 @@ func Test_testSenarios(t *testing.T) {
 	}
 
 	server := StartTestServer()
-	defer server.Close()
-
-	ctx, cancel := NewContext(1*time.Minute, nil)
-	defer cancel()
+	t.Cleanup(server.Close)
 
 	for _, p := range files {
+		p := p
 		b := filepath.Base(p)
 		if strings.HasPrefix(b, "_") {
 			continue
 		}
 		t.Run(b, func(t *testing.T) {
+			t.Parallel()
+
+			ctx, cancel := NewContext(1*time.Minute, nil)
+			defer cancel()
+
 			s, err := NewStorage(t.TempDir(), p, time.Now())
 			if err != nil {
 				t.Fatalf("failed to prepare storage: %s", err)
