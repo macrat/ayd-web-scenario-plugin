@@ -111,6 +111,7 @@ func (e Element) Select(L *lua.LState, query string) Element {
 		L,
 		name,
 		false,
+		0,
 		nodeAction(query, &node, chromedp.ByQuery, chromedp.FromNode(e.node)),
 	)
 
@@ -171,13 +172,14 @@ func (e Element) SendKeys(L *lua.LState) {
 		L,
 		fmt.Sprintf("%s:sendKeys(%q)", e.name, text),
 		true,
+		0,
 		chromedp.KeyEventNode(e.node, text, chromedp.KeyModifiers(mod)),
 	)
 }
 
 func (e Element) SetValue(L *lua.LState) {
 	value := L.CheckString(2)
-	e.tab.Run(L, fmt.Sprintf("%s:setValue(%q)", e.name, value), true, chromedp.SetValue(e.ids(), value, chromedp.ByNodeID))
+	e.tab.Run(L, fmt.Sprintf("%s:setValue(%q)", e.name, value), true, 0, chromedp.SetValue(e.ids(), value, chromedp.ByNodeID))
 }
 
 func (e Element) Click(L *lua.LState) {
@@ -190,19 +192,19 @@ func (e Element) Click(L *lua.LState) {
 		name = fmt.Sprintf("%s:click(%q)", e.name, button)
 	}
 
-	e.tab.Run(L, name, true, chromedp.MouseClickNode(e.node, chromedp.Button(button)))
+	e.tab.Run(L, name, true, 0, chromedp.MouseClickNode(e.node, chromedp.Button(button)))
 }
 
 func (e Element) Submit(L *lua.LState) {
-	e.tab.Run(L, fmt.Sprintf("%s:submit()", e.name), true, chromedp.Submit(e.ids(), chromedp.ByNodeID))
+	e.tab.Run(L, fmt.Sprintf("%s:submit()", e.name), true, 0, chromedp.Submit(e.ids(), chromedp.ByNodeID))
 }
 
 func (e Element) Focus(L *lua.LState) {
-	e.tab.Run(L, fmt.Sprintf("%s:focus()", e.name), false, chromedp.Focus(e.ids(), chromedp.ByNodeID))
+	e.tab.Run(L, fmt.Sprintf("%s:focus()", e.name), false, 0, chromedp.Focus(e.ids(), chromedp.ByNodeID))
 }
 
 func (e Element) Blur(L *lua.LState) {
-	e.tab.Run(L, fmt.Sprintf("%s:blur()", e.name), false, chromedp.Blur(e.ids(), chromedp.ByNodeID))
+	e.tab.Run(L, fmt.Sprintf("%s:blur()", e.name), false, 0, chromedp.Blur(e.ids(), chromedp.ByNodeID))
 }
 
 func (e Element) Screenshot(L *lua.LState) {
@@ -213,6 +215,7 @@ func (e Element) Screenshot(L *lua.LState) {
 		L,
 		fmt.Sprintf("%s:screenshot(%v)", e.name, name),
 		false,
+		0,
 		chromedp.Screenshot(e.ids(), &buf, chromedp.ByNodeID),
 		chromedp.ActionFunc(func(ctx context.Context) error {
 			return e.tab.Save(name, ".png", buf)
@@ -222,28 +225,28 @@ func (e Element) Screenshot(L *lua.LState) {
 
 func (e Element) GetText(L *lua.LState) int {
 	var text string
-	e.tab.Run(L, fmt.Sprintf("%s.text", e.name), false, chromedp.Text(e.ids(), &text, chromedp.ByNodeID))
+	e.tab.Run(L, fmt.Sprintf("%s.text", e.name), false, 0, chromedp.Text(e.ids(), &text, chromedp.ByNodeID))
 	L.Push(lua.LString(text))
 	return 1
 }
 
 func (e Element) GetInnerHTML(L *lua.LState) int {
 	var html string
-	e.tab.Run(L, fmt.Sprintf("%s.innerHTML", e.name), false, chromedp.InnerHTML(e.ids(), &html, chromedp.ByNodeID))
+	e.tab.Run(L, fmt.Sprintf("%s.innerHTML", e.name), false, 0, chromedp.InnerHTML(e.ids(), &html, chromedp.ByNodeID))
 	L.Push(lua.LString(html))
 	return 1
 }
 
 func (e Element) GetOuterHTML(L *lua.LState) int {
 	var html string
-	e.tab.Run(L, fmt.Sprintf("%s.outerHTML", e.name), false, chromedp.OuterHTML(e.ids(), &html, chromedp.ByNodeID))
+	e.tab.Run(L, fmt.Sprintf("%s.outerHTML", e.name), false, 0, chromedp.OuterHTML(e.ids(), &html, chromedp.ByNodeID))
 	L.Push(lua.LString(html))
 	return 1
 }
 
 func (e Element) GetValue(L *lua.LState) int {
 	var value string
-	e.tab.Run(L, fmt.Sprintf("%s.value", e.name), false, chromedp.Value(e.ids(), &value, chromedp.ByNodeID))
+	e.tab.Run(L, fmt.Sprintf("%s.value", e.name), false, 0, chromedp.Value(e.ids(), &value, chromedp.ByNodeID))
 	L.Push(lua.LString(value))
 	return 1
 }
@@ -253,7 +256,7 @@ func (e Element) GetAttribute(L *lua.LState) int {
 
 	var value string
 	var ok bool
-	e.tab.Run(L, fmt.Sprintf("%s[%q]", e.name, name), false, chromedp.AttributeValue(e.ids(), name, &value, &ok, chromedp.ByNodeID))
+	e.tab.Run(L, fmt.Sprintf("%s[%q]", e.name, name), false, 0, chromedp.AttributeValue(e.ids(), name, &value, &ok, chromedp.ByNodeID))
 
 	if ok {
 		L.Push(lua.LString(value))

@@ -112,7 +112,7 @@ func NewTab(ctx context.Context, L *lua.LState, env *Environment) *Tab {
 	}
 
 	if url != "" {
-		t.Run(L, fmt.Sprintf("$:go(%q)", url), true, chromedp.Navigate(url))
+		t.Run(L, fmt.Sprintf("$:go(%q)", url), true, 0, chromedp.Navigate(url))
 	}
 
 	return t
@@ -183,7 +183,7 @@ func (t *Tab) ToLua(L *lua.LState) *lua.LUserData {
 				}
 
 				var body []byte
-				t.Run(L, "$response:body()", false, chromedp.ActionFunc(func(ctx context.Context) (err error) {
+				t.Run(L, "$response:body()", false, 0, chromedp.ActionFunc(func(ctx context.Context) (err error) {
 					ctx, cancel := context.WithTimeout(ctx, 1*time.Minute)
 					defer cancel()
 
@@ -232,6 +232,7 @@ func (t *Tab) RecordOnce(L *lua.LState, taskName string) {
 			L,
 			taskName,
 			false,
+			0,
 			captureScreenshotForRecording(&buf),
 			t.recorder.Record(where, &buf),
 		)
@@ -243,11 +244,17 @@ func (t *Tab) RunInCallback(actions ...chromedp.Action) {
 	t.env.HandleError(chromedp.Run(t.ctx, actions...))
 }
 
-func (t *Tab) Run(L *lua.LState, taskName string, capture bool, action ...chromedp.Action) {
+func (t *Tab) Run(L *lua.LState, taskName string, capture bool, timeout time.Duration, action ...chromedp.Action) {
 	where := L.Where(1)
 	t.env.StartTask(where, taskName)
 
 	err := AsyncRun(t.env, func() error {
+		ctx := t.ctx
+		if timeout > 0 {
+			var cancel context.CancelFunc
+			ctx, cancel = context.WithTimeout(ctx, timeout)
+			defer cancel()
+		}
 		if capture && t.recorder != nil {
 			var buf []byte
 
@@ -257,7 +264,7 @@ func (t *Tab) Run(L *lua.LState, taskName string, capture bool, action ...chrome
 				t.recorder.Record(where, &buf),
 			)
 		}
-		return chromedp.Run(t.ctx, action...)
+		return chromedp.Run(ctx, action...)
 	})
 	t.env.HandleError(err)
 }
@@ -284,19 +291,19 @@ func (t *Tab) Save(name, ext string, data []byte) error {
 func (t *Tab) Go(L *lua.LState) {
 	url := L.CheckString(2)
 
-	t.Run(L, fmt.Sprintf("$:go(%q)", url), true, chromedp.Navigate(url))
+	t.Run(L, fmt.Sprintf("$:go(%q)", url), true, 0, chromedp.Navigate(url))
 }
 
 func (t *Tab) Forward(L *lua.LState) {
-	t.Run(L, "$:forward()", true, chromedp.NavigateForward())
+	t.Run(L, "$:forward()", true, 0, chromedp.NavigateForward())
 }
 
 func (t *Tab) Back(L *lua.LState) {
-	t.Run(L, "$:back()", true, chromedp.NavigateBack())
+	t.Run(L, "$:back()", true, 0, chromedp.NavigateBack())
 }
 
 func (t *Tab) Reload(L *lua.LState) {
-	t.Run(L, "$:reload()", true, chromedp.Reload())
+	t.Run(L, "$:reload()", true, 0, chromedp.Reload())
 }
 
 func (t *Tab) Close() error {
@@ -336,6 +343,7 @@ func (t *Tab) Screenshot(L *lua.LState) {
 		L,
 		fmt.Sprintf("$:screenshot(%v)", name),
 		false,
+		0,
 		chromedp.CaptureScreenshot(&buf),
 		chromedp.ActionFunc(func(ctx context.Context) error {
 			return t.Save(name, ".png", buf)
@@ -345,8 +353,9 @@ func (t *Tab) Screenshot(L *lua.LState) {
 
 func (t *Tab) Wait(L *lua.LState) {
 	query := L.CheckString(2)
+	timeout := time.Duration(float64(L.OptNumber(3, 0)) * float64(time.Millisecond))
 
-	t.Run(L, fmt.Sprintf("$:wait(%q)", query), true, chromedp.WaitVisible(query, chromedp.ByQuery))
+	t.Run(L, fmt.Sprintf("$:wait(%q)", query), true, timeout, chromedp.WaitVisible(query, chromedp.ByQuery))
 }
 
 func (t *Tab) WaitEvent(L *lua.LState, taskName string, h *EventHandler) int {
@@ -450,9 +459,9 @@ func (t *Tab) OnDownload(L *lua.LState) {
 
 func (t *Tab) updateNetworkConfig(L *lua.LState, taskName string) {
 	if t.requestEvent.IsFuncSet() || t.responseEvent.IsFuncSet() {
-		t.Run(L, taskName, false, network.Enable())
+		t.Run(L, taskName, false, 0, network.Enable())
 	} else {
-		t.Run(L, taskName, false, network.Disable())
+		t.Run(L, taskName, false, 0, network.Disable())
 	}
 }
 
@@ -470,21 +479,21 @@ func (t *Tab) Eval(L *lua.LState) int {
 	script := L.CheckString(2)
 
 	var res any
-	t.Run(L, fmt.Sprintf("$:eval([[ %s ]])", script), true, chromedp.Evaluate(script, &res))
+	t.Run(L, fmt.Sprintf("$:eval([[ %s ]])", script), true, 0, chromedp.Evaluate(script, &res))
 	L.Push(PackLValue(L, res))
 	return 1
 }
 
 func (t *Tab) GetURL(L *lua.LState) int {
 	var url string
-	t.Run(L, "$.url", false, chromedp.Location(&url))
+	t.Run(L, "$.url", false, 0, chromedp.Location(&url))
 	L.Push(lua.LString(url))
 	return 1
 }
 
 func (t *Tab) GetTitle(L *lua.LState) int {
 	var title string
-	t.Run(L, "$.title", false, chromedp.Title(&title))
+	t.Run(L, "$.title", false, 0, chromedp.Title(&title))
 	L.Push(lua.LString(title))
 	return 1
 }
@@ -583,7 +592,7 @@ func RegisterTabType(ctx context.Context, env *Environment) {
 		"__tostring": func(L *lua.LState) int {
 			var url, title string
 			t := CheckTab(L)
-			t.Run(L, "tostring($)", false, chromedp.Location(&url), chromedp.Title(&title))
+			t.Run(L, "tostring($)", false, 0, chromedp.Location(&url), chromedp.Title(&title))
 			L.Push(lua.LString("[" + title + "](" + url + ")"))
 			return 1
 		},

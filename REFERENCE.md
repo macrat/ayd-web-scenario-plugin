@@ -85,9 +85,12 @@ Get [element](#element)s table using a XPath `query`.
 
 The result of this method is a table of [element](#element)s with the same metatable with [`tab:all(query)`](#taballquery)'s one.
 
-#### `tab:wait(query)`
+#### `tab:wait(query, [timeout])`
 
 Wait until an element specified in `query` to ready.
+
+It raises an error if the `timeout` in millisecond exceeded.
+The default `timeout` is -1 means wait forever.
 
 
 ### Retrieve tab information ###
@@ -416,7 +419,7 @@ Get current time in UNIX time, milliseconds.
 
 Pause program for specified `milliseconds`.
 
-It's highly recommended to use [`tab:wait()`](#tabwaitquery) method if possible, for execution speed and stability reasons.
+It's highly recommended to use [`tab:wait()`](#tabwaitquerytimeout) method if possible, for execution speed and stability reasons.
 
 #### `time.millisecond` / `time.second` / `time.minute` / `time.hour` / `time.day` / `time.year`
 
