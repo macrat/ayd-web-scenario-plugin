@@ -1,6 +1,7 @@
-t = tab.new()
-       :recording(true)
-       :go("https://www.google.com")
+t = tab.new({
+    url="https://www.google.com",
+    recording=true,
+})
 
 t("input[type=text]")
     :sendKeys("ayd status monitoring tool")

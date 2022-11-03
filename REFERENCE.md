@@ -16,9 +16,20 @@ Tab
 
 ### Create and close tab ###
 
-#### `tab.new([url])`
+#### `tab.new([option])`
 
-Make a new tab. It opens `about:blank` if `url` is not specified.
+Make a new tab.
+
+If `option` is nil, the new tab opens `about:blank`.
+
+If `option` is a string, the new tab opens that string as an URL.
+
+If `option` is a table, this function uses below properties.
+
+- `url`: The URL string for the new tab. Default is `about:blank`.
+- `width`: The width number of the tab's viewport. Default is 800.
+- `height`: The height number of the tab's viewport. Default is 800.
+- `recording`: Boolean to enable animated GIF record for the tab. Default is false.
 
 #### `tab:close()`
 

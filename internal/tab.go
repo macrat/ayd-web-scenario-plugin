@@ -61,7 +61,30 @@ type Tab struct {
 	recorder *Recorder
 }
 
-func NewTab(ctx context.Context, L *lua.LState, env *Environment, url string) *Tab {
+func NewTab(ctx context.Context, L *lua.LState, env *Environment) *Tab {
+	url := ""
+	width, height := int64(800), int64(800)
+	recording := false
+
+	switch v := L.Get(1).(type) {
+	case lua.LString:
+		url = string(v)
+	case *lua.LTable:
+		if u, ok := L.GetField(v, "url").(lua.LString); ok {
+			url = string(u)
+		}
+		if w, ok := L.GetField(v, "width").(lua.LNumber); ok {
+			width = int64(w)
+		}
+		if h, ok := L.GetField(v, "height").(lua.LNumber); ok {
+			height = int64(h)
+		}
+		recording = lua.LVAsBool(L.GetField(v, "recording"))
+	case *lua.LNilType:
+	default:
+		L.ArgError(1, "a nil, a string, or a table expected.")
+	}
+
 	t := AsyncRun(env, func() *Tab {
 		ctx, cancel := chromedp.NewContext(ctx)
 		t := &Tab{
@@ -69,8 +92,8 @@ func NewTab(ctx context.Context, L *lua.LState, env *Environment, url string) *T
 			cancel:  cancel,
 			env:     env,
 			loading: NewLoadWaiter(),
-			width:   1280,
-			height:  720,
+			width:   width,
+			height:  height,
 
 			dialogEvent:   NewEventHandler((*Tab).HandleDialog),
 			downloadEvent: NewEventHandler((*Tab).HandleEvent),
@@ -84,7 +107,7 @@ func NewTab(ctx context.Context, L *lua.LState, env *Environment, url string) *T
 		return t
 	})
 
-	if env.EnableRecording {
+	if recording || env.EnableRecording {
 		t.recorder = NewRecorder(t.ctx)
 	}
 
@@ -328,27 +351,6 @@ func (t *Tab) Screenshot(L *lua.LState) {
 	)
 }
 
-func (t *Tab) SetViewport(L *lua.LState) {
-	w := L.CheckInt64(2)
-	h := L.CheckInt64(3)
-
-	t.Run(L, fmt.Sprintf("$:setViewport(%d, %d)", w, h), true, chromedp.EmulateViewport(w, h))
-	t.width, t.height = w, h
-}
-
-func (t *Tab) Recording(L *lua.LState) {
-	if L.CheckBool(2) {
-		if t.recorder == nil {
-			t.recorder = NewRecorder(t.ctx)
-		}
-	} else {
-		if t.recorder != nil {
-			t.recorder.Close()
-			t.recorder = nil
-		}
-	}
-}
-
 func (t *Tab) Wait(L *lua.LState) {
 	query := L.CheckString(2)
 
@@ -527,8 +529,6 @@ func RegisterTabType(ctx context.Context, env *Environment) {
 		"reload":       fn((*Tab).Reload),
 		"close":        fn((*Tab).LClose),
 		"screenshot":   fn((*Tab).Screenshot),
-		"setViewport":  fn((*Tab).SetViewport),
-		"recording":    fn((*Tab).Recording),
 		"wait":         fn((*Tab).Wait),
 		"onDialog":     fn((*Tab).OnDialog),
 		"onDownload":   fn((*Tab).OnDownload),
@@ -567,12 +567,7 @@ func RegisterTabType(ctx context.Context, env *Environment) {
 
 	env.RegisterNewType("tab", map[string]lua.LGFunction{
 		"new": func(L *lua.LState) int {
-			var url string
-			if L.GetTop() > 0 {
-				url = L.CheckString(1)
-			}
-
-			t := NewTab(ctx, L, env, url)
+			t := NewTab(ctx, L, env)
 			env.registerTab(t)
 			L.Push(t.ToLua(L))
 			return 1
