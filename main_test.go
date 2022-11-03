@@ -1,14 +1,17 @@
 package main
 
 import (
+	"runtime"
 	"testing"
 )
 
 func TestNormalizeURL(t *testing.T) {
-	tests := []struct {
+	type Test struct {
 		input string
 		want  string
-	}{
+	}
+
+	tests := []Test{
 		{"web-scenario:/path/to/script.lua", "web-scenario:/path/to/script.lua"},
 		{"web-scenario:./path/to/script.lua", "web-scenario:./path/to/script.lua"},
 		{"web-scenario:path/to/script.lua", "web-scenario:path/to/script.lua"},
@@ -16,7 +19,10 @@ func TestNormalizeURL(t *testing.T) {
 		{"web-scenario://localhost/path/to/script.lua", "web-scenario:/path/to/script.lua"},
 		{"_examples/github-status.lua", "web-scenario:_examples/github-status.lua"},
 		{"./_examples/github-status.lua", "web-scenario:./_examples/github-status.lua"},
-		{".\\_examples\\github-status.lua", "web-scenario:./_examples/github-status.lua"},
+	}
+
+	if runtime.GOOS == "windows" {
+		tests = append(tests, Test{".\\_examples\\github-status.lua", "web-scenario:./_examples/github-status.lua"})
 	}
 
 	for _, tt := range tests {
