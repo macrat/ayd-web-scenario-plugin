@@ -92,6 +92,11 @@ Wait until an element specified in `query` to ready.
 It raises an error if the `timeout` in millisecond exceeded.
 The default `timeout` is -1 means wait forever.
 
+#### `tab:waitXPath(xpath, [timeout])`
+
+Wait until an element specified in `xpath` to ready.
+This function is very similar to [`tab:wait()`](#tabwaitquerytimeout) but it uses XPath instead of CSS selector.
+
 
 ### Retrieve tab information ###
 

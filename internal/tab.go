@@ -358,6 +358,13 @@ func (t *Tab) Wait(L *lua.LState) {
 	t.Run(L, fmt.Sprintf("$:wait(%q)", query), true, timeout, chromedp.WaitVisible(query, chromedp.ByQuery))
 }
 
+func (t *Tab) WaitXPath(L *lua.LState) {
+	query := L.CheckString(2)
+	timeout := time.Duration(float64(L.OptNumber(3, 0)) * float64(time.Millisecond))
+
+	t.Run(L, fmt.Sprintf("$:waitXPath(%q)", query), true, timeout, chromedp.WaitVisible(query, chromedp.BySearch))
+}
+
 func (t *Tab) WaitEvent(L *lua.LState, taskName string, h *EventHandler) int {
 	timeout := time.Duration(float64(L.OptNumber(2, -1)) * float64(time.Millisecond))
 
@@ -531,14 +538,15 @@ func RegisterTabType(ctx context.Context, env *Environment) {
 		"close":        fn((*Tab).LClose),
 		"screenshot":   fn((*Tab).Screenshot),
 		"wait":         fn((*Tab).Wait),
-		"onDialog":     fn((*Tab).OnDialog),
-		"onDownload":   fn((*Tab).OnDownload),
-		"onRequest":    fn((*Tab).OnRequest),
-		"onResponse":   fn((*Tab).OnResponse),
+		"waitXPath":    fn((*Tab).WaitXPath),
 		"waitDialog":   fret((*Tab).WaitDialog),
 		"waitDownload": fret((*Tab).WaitDownload),
 		"waitRequest":  fret((*Tab).WaitRequest),
 		"waitResponse": fret((*Tab).WaitResponse),
+		"onDialog":     fn((*Tab).OnDialog),
+		"onDownload":   fn((*Tab).OnDownload),
+		"onRequest":    fn((*Tab).OnRequest),
+		"onResponse":   fn((*Tab).OnResponse),
 		"all": env.NewFunction(func(L *lua.LState) int {
 			t := CheckTab(L)
 			query := L.CheckString(2)
