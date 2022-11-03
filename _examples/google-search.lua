@@ -3,7 +3,7 @@ t = tab.new({
     recording=true,
 })
 
-t("input[type=text]"):sendKeys("ayd status monitoring tool\n")
+t("input[type=text]"):sendKeys("ayd status monitoring tool" .. key.enter)
 
 t:wait("div[role=main]")
 
