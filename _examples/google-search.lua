@@ -7,7 +7,7 @@ t("input[type=text]"):sendKeys("ayd status monitoring tool" .. key.enter)
 
 t:wait("div[role=main]")
 
-for i, elm in ipairs(t:all("h1")) do
+for i, elm in ipairs(t:all("#search h3")) do
     print.extra(string.format("result_%d", i), elm.text)
 end
 
