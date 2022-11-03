@@ -117,12 +117,9 @@ t:eval([[
 
 ### Event handling ###
 
-You can set only one callback function for each events.
-The previous callback function will be disabled when you set a new callback function.
+#### `tab:onDialog([callback])`
 
-#### `tab:onDialog(callback)`
-
-Set a callback function that will called when dialog opened in the tab.
+Set or unset callback function that will called when dialog opened in the tab.
 When the callback not set, the browser clicks OK button for all dialogs.
 
 ``` lua
@@ -138,18 +135,47 @@ t:onDialog(function(dialog)
 end)
 ```
 
-#### `tab:onDownloaded(callback)`
+#### `tab:waitDialog([timeout])`
 
-Set a callback function that will called when file downloaded from the tab.
+Wait for a dialog shown until `timeout` in millisecond.
+It can receive dialogs already shown but not waited yet, unlike [`tab:onDialog`](#tabondialogcallback).
+But this function just receive information and can do nothing to the dialog.
+
+This method returns two values.
+The first one is `tab` itself for using method chain.
+The second one is information of dialog, that is the same as [`tab:onDialog`](#tabondialogcallback)'s argument.
+
+#### `tab.dialogs`
+
+Get a dialog list that shown in the tab.
+Please see also [`tab:onDialog`](#tabondialogcallback)
+
+#### `tab:onDownload([callback])`
+
+Set or unset callback function that will called when file downloaded from the tab.
 
 ``` lua
-t:onDownloaded(function(file)
+t:onDownload(function(file)
   print(file.path)  -- Path to downloaded file in string.
   print(file.bytes) -- The size of downloaded file in bytes.
 
   return -- Return nothing.
 end)
 ```
+
+#### `tab:waitDownload([timeout])`
+
+Wait for a file downloaded until `timeout` in millisecond.
+It can receive downloads already done but not waited yet, unlike [`tab:onDownload`](#tabondownloadcallback).
+
+This method returns two values.
+The first one is `tab` itself for using method chain.
+The second one is information of downloaded file, that is the same as [`tab:onDownload`](#tabdownloadcallback)'s argument.
+
+#### `tab.downloads`
+
+Get a file list that downloaded from the tab.
+Please see also [`tab:onDownloaded`](#tabondownloadcallback)
 
 #### `tab:onRequest(callback)`
 
@@ -166,6 +192,20 @@ t:onRequest(function(req)
   return -- Return nothing.
 end)
 ```
+
+#### `tab:waitRequest([timeout])`
+
+Wait for a network request until `timeout` in millisecond.
+It can receive request already done but not waited yet, unlike [`tab:onRequest`](#tabonrequestcallback).
+
+This method returns two values.
+The first one is `tab` itself for using method chain.
+The second one is information of the request, that is the same as [`tab:onRequest`](#tabonrequestcallback)'s argument.
+
+#### `tab.requests`
+
+Get a request list that sent from the tab.
+Please see also [`tab:onRequest`](#tabonrequestcallback)
 
 #### `tab:onResponse(callback)`
 
@@ -189,6 +229,20 @@ t:onResponse(function(res)
   return -- Return nothing.
 end)
 ```
+
+#### `tab:waitResponse([timeout])`
+
+Wait for a network response received until `timeout` in millisecond.
+It can receive response already done but not waited yet, unlike [`tab:onResponse`](#tabonresponsecallback).
+
+This method returns two values.
+The first one is `tab` itself for using method chain.
+The second one is information of the response, that is the same as [`tab:onResponse`](#tabonresponsecallback)'s argument.
+
+#### `tab.responses`
+
+Get a response list that the tab received.
+Please see also [`tab:onResponse`](#tabonresponsecallback)
 
 
 Element

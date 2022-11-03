@@ -4,16 +4,14 @@ storage = require("utils/storage")
 t1 = tab.new(TEST.url("/download"))
 t2 = tab.new(TEST.url("/download"))
 
-download_count = 0
-t1:onDownloaded(function(file)
+t1:onDownload(function(file)
     assert.eq(file, {
         path  = TEST.storage("data.txt"),
         bytes = 14,
     })
-    download_count = download_count + 1
 end)
 
-t2:onDownloaded(function(file)
+t2:onDownload(function(file)
     error("should not reach here")
 end)
 
@@ -21,11 +19,19 @@ t1("a")
     :click()
     :click()
 
-while download_count < 2 do
-    time.sleep(5 * time.millisecond)
-end
+_, file = t1:waitDownload()
+assert.eq(file, {path=TEST.storage("data.txt"), bytes=14})
+t1:waitDownload()
 
-assert.eq(download_count, 2)
+ok, err = pcall(t1.waitDownload, t1, 0)
+assert.eq(ok, false)
+assert.eq(err, "testdata/handle-download.lua:26: timeout")
+
+assert.eq(t1.downloads, {
+    {path=TEST.storage("data.txt"), bytes=14},
+    {path=TEST.storage("data.txt"), bytes=14},
+    _waited=2,
+})
 assert.eq(string.gsub(io.popen("ls " .. TEST.storage()):read("*a"), "\r\n", "\n"), "data.txt\n")
 
 f = io.input(TEST.storage("data.txt"))

@@ -89,17 +89,12 @@ func AsyncRun[T any](env *Environment, f func() T) T {
 }
 
 // CallEventHandler calls an event callback function with GIL.
-func (env *Environment) CallEventHandler(f *lua.LFunction, args map[string]lua.LValue, nret int) []lua.LValue {
+func (env *Environment) CallEventHandler(f *lua.LFunction, arg *lua.LTable, nret int) []lua.LValue {
 	env.Lock()
 	defer env.Unlock()
 
 	L, cancel := env.lua.NewThread()
 	defer cancel()
-
-	arg := L.NewTable()
-	for k, v := range args {
-		L.SetField(arg, k, v)
-	}
 
 	L.Push(f)
 	L.Push(arg)
