@@ -17,6 +17,7 @@ func NewExecAllocator(ctx context.Context, withHead bool) (context.Context, cont
 	opts := []chromedp.ExecAllocatorOption{
 		chromedp.NoFirstRun,
 		chromedp.NoDefaultBrowserCheck,
+		chromedp.WindowSize(800, 800),
 
 		chromedp.Flag("disable-background-networking", true),
 		chromedp.Flag("enable-features", "NetworkService,NetworkServiceInProcess"),
