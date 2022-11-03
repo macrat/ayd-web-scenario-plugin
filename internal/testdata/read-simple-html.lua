@@ -11,3 +11,7 @@ assert.eq(t("#greeting").outerHTML, [[<div id="greeting">hello <b class="target"
 
 assert.eq(t(".target").class, "target")
 assert.eq(t("#greeting").id, "greeting")
+
+ok, err = pcall(t, "#no-such-element")
+assert.eq(ok, false)
+assert.eq(err, "testdata/read-simple-html.lua:15: no such element")

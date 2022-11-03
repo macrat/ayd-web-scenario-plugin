@@ -256,6 +256,9 @@ func (t *Tab) RunSelector(L *lua.LState, taskName string, action ...chromedp.Act
 
 		return chromedp.Run(ctx, action...)
 	})
+	if errors.Is(err, context.DeadlineExceeded) {
+		L.RaiseError("no such element")
+	}
 	t.env.HandleError(err)
 }
 
