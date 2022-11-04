@@ -18,8 +18,8 @@ type Arg struct {
 }
 
 func (a Arg) Path() string {
-	if a.Mode == "repl" {
-		return "repl"
+	if a.Mode == "repl" || a.Mode == "stdin" {
+		return "out"
 	} else if a.Target.Opaque != "" {
 		return a.Target.Opaque
 	} else {
