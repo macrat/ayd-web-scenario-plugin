@@ -61,9 +61,9 @@ func (env *Environment) DoREPL(ctx context.Context) error {
 		}
 
 		env.Lock()
-		if f, err := env.lua.Load(strings.NewReader("return "+code), "<stdin>"); err == nil {
+		if f, err := env.lua.Load(strings.NewReader("return "+code), "<repl>"); err == nil {
 			env.lua.Push(f)
-		} else if f, err := env.lua.Load(strings.NewReader(code), "<stdin>"); err == nil {
+		} else if f, err := env.lua.Load(strings.NewReader(code), "<repl>"); err == nil {
 			env.lua.Push(f)
 		} else if isIncomplete(err) {
 			continue
@@ -72,6 +72,8 @@ func (env *Environment) DoREPL(ctx context.Context) error {
 			code = ""
 			continue
 		}
+
+		sourceImager.RecordStdin(strings.Split(code, "\n"))
 
 		if err = env.lua.PCall(0, lua.MultRet, nil); err != nil {
 			env.logger.HandleError(ctx, err)
@@ -94,8 +96,26 @@ func (env *Environment) DoREPL(ctx context.Context) error {
 	}
 }
 
+type SourceRecordReader struct {
+	Upstream io.Reader
+	buf      string
+}
+
+func (r *SourceRecordReader) Read(b []byte) (int, error) {
+	n, err := r.Upstream.Read(b)
+	if err == nil {
+		xs := strings.Split(r.buf+string(b), "\n")
+		xs, r.buf = xs[:len(xs)-1], xs[len(xs)-1]
+		sourceImager.RecordStdin(xs)
+	}
+	if err == io.EOF {
+		sourceImager.RecordStdin([]string{r.buf})
+	}
+	return n, err
+}
+
 func (env *Environment) DoStream(r io.Reader, name string) error {
-	f, err := env.lua.Load(r, name)
+	f, err := env.lua.Load(&SourceRecordReader{Upstream: r}, name)
 	if err != nil {
 		return err
 	}

@@ -13,6 +13,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 
 	"golang.org/x/image/draw"
 	"golang.org/x/image/font"
@@ -77,6 +78,9 @@ func parseWhere(where string) (string, int) {
 	line, err := strconv.Atoi(where[pos+1:])
 	if err != nil {
 		return where[:pos], 0
+	}
+	if where[:pos] == "<repl>" {
+		return "<repl>", 0
 	}
 	return where[:pos], line
 }
@@ -165,6 +169,8 @@ func (r *Recorder) SaveTo(f io.Writer) error {
 }
 
 type SourceImager struct {
+	sync.Mutex
+
 	face    font.Face
 	sources map[string][]string
 }
@@ -199,6 +205,9 @@ func NewSourceImager() (*SourceImager, error) {
 }
 
 func (s *SourceImager) Load(path string) ([]string, error) {
+	s.Lock()
+	defer s.Unlock()
+
 	if xs, ok := s.sources[path]; ok {
 		return xs, nil
 	}
@@ -209,6 +218,17 @@ func (s *SourceImager) Load(path string) ([]string, error) {
 	xs := strings.Split(strings.ReplaceAll(string(f), "\r", ""), "\n")
 	s.sources[path] = xs
 	return xs, nil
+}
+
+func (s *SourceImager) RecordStdin(lines []string) {
+	s.Lock()
+	defer s.Unlock()
+
+	if xs, ok := s.sources["<stdin>"]; ok {
+		s.sources["<stdin>"] = append(append(xs, lines...), "")
+	} else {
+		s.sources["<stdin>"] = append(lines, "")
+	}
 }
 
 func (s *SourceImager) LoadAsImage(img *image.Paletted, rect image.Rectangle, path string, line int) {
