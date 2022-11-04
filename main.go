@@ -17,14 +17,19 @@ var (
 	Commit  = "UNKNOWN"
 )
 
-func ParseTargetURL(s string) (*ayd.URL, error) {
+func ParseTargetURL(s string) (mode string, url *ayd.URL, err error) {
 	u, err := ayd.ParseURL(s)
 	if err != nil {
-		return nil, err
+		return "", nil, err
 	}
+
 	if u.Scheme == "" {
-		u.Scheme = "web-scenario"
+		mode = "standalone"
+	} else {
+		mode = "ayd"
 	}
+	u.Scheme = "web-scenario"
+
 	if u.User != nil {
 		u.Host = ""
 		u.Path = filepath.ToSlash(u.Path)
@@ -36,7 +41,8 @@ func ParseTargetURL(s string) (*ayd.URL, error) {
 		u.Host = ""
 		u.Opaque = filepath.ToSlash(u.Opaque)
 	}
-	return u, nil
+
+	return mode, u, nil
 }
 
 func main() {
@@ -62,7 +68,7 @@ func main() {
 		fmt.Printf("Ayd WebScenaro plugin %s (%s)\n", Version, Commit)
 		return
 	case *showHelp || len(flags.Args()) != 1:
-		fmt.Println("$ ayd-web-scenario-plugin [OPTIONS] TARGET_URL\n\nOptions:")
+		fmt.Println("$ ayd-web-scenario-plugin [OPTIONS] TARGET_URL|FILE\n\nOptions:")
 		flags.PrintDefaults()
 		return
 	}
@@ -74,7 +80,7 @@ func main() {
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "failed to create profile file.")
 			fmt.Fprintln(os.Stderr, err)
-			os.Exit(1)
+			os.Exit(2)
 		}
 		defer f.Close()
 		pprof.StartCPUProfile(f)
@@ -82,7 +88,7 @@ func main() {
 	}
 
 	var err error
-	arg.Target, err = ParseTargetURL(flags.Arg(0))
+	arg.Mode, arg.Target, err = ParseTargetURL(flags.Arg(0))
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		fmt.Fprintf(os.Stderr, "\nPlease see `%s -h` for more information.\n", os.Args[0])
@@ -91,5 +97,11 @@ func main() {
 
 	arg.Timeout = 50 * time.Minute
 	rec := webscenario.Run(arg)
-	ayd.NewLogger(arg.Target).Print(rec)
+	if arg.Mode == "ayd" {
+		ayd.NewLogger(arg.Target).Print(rec)
+	} else {
+		if rec.Status != ayd.StatusHealthy {
+			os.Exit(1)
+		}
+	}
 }

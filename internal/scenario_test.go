@@ -185,7 +185,7 @@ func Test_testSenarios(t *testing.T) {
 				t.Fatalf("failed to prepare storage: %s", err)
 			}
 
-			logger := &Logger{DebugOut: (*DebugWriter)(t)}
+			logger := &Logger{Stream: (*DebugWriter)(t)}
 			env := NewEnvironment(ctx, logger, s, Arg{Args: []string{"abc", "def"}, Target: target})
 			defer env.Close()
 

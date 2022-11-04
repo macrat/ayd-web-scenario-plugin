@@ -87,9 +87,9 @@ func NewContext(timeout time.Duration, withHead bool, debuglog *ayd.Logger) (con
 func Run(arg Arg) ayd.Record {
 	timestamp := time.Now()
 
-	logger := &Logger{Status: ayd.StatusHealthy}
-	if arg.Debug {
-		logger.DebugOut = os.Stderr
+	logger := &Logger{Status: ayd.StatusHealthy, Debug: arg.Debug}
+	if arg.Mode == "standalone" {
+		logger.Stream = os.Stdout
 	}
 
 	baseDir := os.Getenv("WEBSCENARIO_ARTIFACT_DIR")

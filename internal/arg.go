@@ -8,6 +8,7 @@ import (
 )
 
 type Arg struct {
+	Mode      string
 	Args      []string
 	Target    *ayd.URL
 	Timeout   time.Duration
