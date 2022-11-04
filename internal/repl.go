@@ -72,21 +72,25 @@ func (env *Environment) DoREPL(ctx context.Context) error {
 			code = ""
 			continue
 		}
-		code = ""
 
 		if err = env.lua.PCall(0, lua.MultRet, nil); err != nil {
 			env.logger.HandleError(ctx, err)
 		}
 
-		var xs []string
-		for i := 1; i <= env.lua.GetTop(); i++ {
-			xs = append(xs, string(env.lua.ToStringMeta(env.lua.Get(i)).(lua.LString)))
-		}
-		if len(xs) > 0 {
-			fmt.Fprintln(rl, strings.Join(xs, "\t"))
+		if (code == "exit" || code == "quit" || code == "bye") && env.lua.GetTop() == 1 && env.lua.Get(1).Type() == lua.LTNil {
+			fmt.Fprintln(rl, "Use os.exit() or Ctrl-D to exit.")
+		} else {
+			var xs []string
+			for i := 1; i <= env.lua.GetTop(); i++ {
+				xs = append(xs, string(env.lua.ToStringMeta(env.lua.Get(i)).(lua.LString)))
+			}
+			if len(xs) > 0 {
+				fmt.Fprintln(rl, strings.Join(xs, "\t"))
+			}
 		}
 
 		env.lua.Pop(env.lua.GetTop())
+		code = ""
 	}
 }
 
