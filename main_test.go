@@ -21,17 +21,17 @@ func TestNormalizeURL(t *testing.T) {
 		{"web-scenario://foo:bar@localhost/path/to/script.lua", "ayd", "web-scenario://foo:xxxxx@/path/to/script.lua"},
 		{"web-scenario://foo:bar@/path/to/script.lua", "ayd", "web-scenario://foo:xxxxx@/path/to/script.lua"},
 		{"web-scenario://foo@/path/to/script.lua", "ayd", "web-scenario://foo@/path/to/script.lua"},
-		{"_examples/github-status.lua", "standalone", "web-scenario:_examples/github-status.lua"},
-		{"./_examples/github-status.lua", "standalone", "web-scenario:./_examples/github-status.lua"},
-		{"_examples/github-status.lua", "standalone", "web-scenario:_examples/github-status.lua"},
+		{"examples/github-status.lua", "standalone", "web-scenario:examples/github-status.lua"},
+		{"./examples/github-status.lua", "standalone", "web-scenario:./examples/github-status.lua"},
+		{"examples/github-status.lua", "standalone", "web-scenario:examples/github-status.lua"},
 	}
 
 	if runtime.GOOS == "windows" {
 		tests = append(
 			tests,
-			Test{`web-scenario://foo:bar@/C:\path\to\script.lua`, "ayd", "web-scenario:./_examples/github-status.lua"},
-			Test{`.\_examples\github-status.lua`, "standalone", "web-scenario:./_examples/github-status.lua"},
-			Test{`_examples\github-status.lua`, "standalone", "web-scenario:_examples/github-status.lua"},
+			Test{`web-scenario://foo:bar@/C:\path\to\script.lua`, "ayd", "web-scenario:./examples/github-status.lua"},
+			Test{`.\examples\github-status.lua`, "standalone", "web-scenario:./examples/github-status.lua"},
+			Test{`examples\github-status.lua`, "standalone", "web-scenario:examples/github-status.lua"},
 		)
 	}
 
