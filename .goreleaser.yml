@@ -1,0 +1,48 @@
+builds:
+  - id: unix
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+    flags:
+      - -trimpath
+    ldflags:
+      - '-s -w'
+      - '-X main.Version={{ .Version }}'
+      - '-X main.Commit={{ .ShortCommit }}'
+    hooks:
+      post: 'upx --lzma {{ .Path }}'
+  - id: windows
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - windows
+    flags:
+      - -trimpath
+    ldflags:
+      - '-s -w'
+      - '-X main.Version={{ .Version }}'
+      - '-X main.Commit={{ .ShortCommit }}'
+
+archives:
+  - format: tar.gz
+    replacements:
+      386: i386
+      amd64: x86_64
+    format_overrides:
+      - goos: windows
+        format: zip
+    files:
+      - src: 'scripts/{{ .Os }}/*'
+        dst: .
+        strip_parent: true
+
+changelog:
+  filters:
+    exclude:
+      - '^chore'
+      - '^docs'
+      - '^refactor'
+      - '^style'
+      - '^test'

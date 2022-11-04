@@ -1,0 +1,3 @@
+#!/bin/sh
+
+ayd-web-scenario $*

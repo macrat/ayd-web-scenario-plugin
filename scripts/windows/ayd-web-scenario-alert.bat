@@ -1,0 +1,1 @@
+@ayd-web-scenario %*
