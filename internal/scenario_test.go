@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/macrat/ayd/lib-ayd"
 	"github.com/yuin/gopher-lua"
 )
 
@@ -168,6 +169,8 @@ func Test_testSenarios(t *testing.T) {
 	ctx, cancel := NewContext(5*time.Minute, false, nil)
 	t.Cleanup(cancel)
 
+	target, _ := ayd.ParseURL("web-scenario://foo:bar@/dummy/script.lua?hello=world&hoge=fuga#piyo")
+
 	for _, p := range files {
 		p := p
 		b := filepath.Base(p)
@@ -183,7 +186,7 @@ func Test_testSenarios(t *testing.T) {
 			}
 
 			logger := &Logger{DebugOut: (*DebugWriter)(t)}
-			env := NewEnvironment(ctx, logger, s)
+			env := NewEnvironment(ctx, logger, s, Arg{Args: []string{"abc", "def"}, Target: target})
 			defer env.Close()
 
 			RegisterTestUtil(env.lua, s, server)

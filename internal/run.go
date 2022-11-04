@@ -84,24 +84,16 @@ func NewContext(timeout time.Duration, withHead bool, debuglog *ayd.Logger) (con
 	}
 }
 
-type Options struct {
-	Target    *ayd.URL
-	Timeout   time.Duration
-	Debug     bool
-	Head      bool
-	Recording bool
-}
-
-func Run(opt Options) ayd.Record {
+func Run(arg Arg) ayd.Record {
 	timestamp := time.Now()
 
 	logger := &Logger{Status: ayd.StatusHealthy}
-	if opt.Debug {
+	if arg.Debug {
 		logger.DebugOut = os.Stderr
 	}
 
 	baseDir := os.Getenv("WEBSCENARIO_ARTIFACT_DIR")
-	storage, err := NewStorage(baseDir, opt.Target.Opaque, timestamp)
+	storage, err := NewStorage(baseDir, arg.Target.Opaque, timestamp)
 	if err != nil {
 		return ayd.Record{
 			Time:    timestamp,
@@ -111,7 +103,7 @@ func Run(opt Options) ayd.Record {
 	}
 
 	var browserlog *ayd.Logger
-	if opt.Debug {
+	if arg.Debug {
 		f, err := storage.Open("browser.log")
 		if err != nil {
 			return ayd.Record{
@@ -121,18 +113,18 @@ func Run(opt Options) ayd.Record {
 			}
 		}
 		defer f.Close()
-		l := ayd.NewLoggerWithWriter(f, opt.Target)
+		l := ayd.NewLoggerWithWriter(f, arg.Target)
 		browserlog = &l
 	}
 
-	ctx, cancel := NewContext(opt.Timeout, opt.Head, browserlog)
+	ctx, cancel := NewContext(arg.Timeout, arg.Head, browserlog)
 	defer cancel()
 
-	env := NewEnvironment(ctx, logger, storage)
-	env.EnableRecording = opt.Recording
+	env := NewEnvironment(ctx, logger, storage, arg)
+	env.EnableRecording = arg.Recording
 
 	stime := time.Now()
-	err = env.DoFile(opt.Target.Opaque)
+	err = env.DoFile(arg.Target.Opaque)
 	latency := time.Since(stime)
 
 	env.Close()

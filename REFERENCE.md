@@ -3,12 +3,32 @@ Reference of Web-Scenario
 
 The Web-Scenario's script is based on the Lua 5.1 ([GopherLua](https://github.com/yuin/gopher-lua)), and some extra functions.
 
+- [arg](#arg): Read argument and options to this execution.
 - [tab](#tab): Open, handle, and close browser tab.
 - [element](#element): Read and control HTML element.
 - [print](#print): Report and store information.
 - [assert](#assert): Assertion test values.
 - [time](#time): Get or wait time.
 - [encoding](#encoding): Serialize or deserialize values.
+
+
+Arg
+---
+
+`arg` is a table includes below properties.
+
+- `arg.target`: The target information that passed via command line argument.
+  * `arg.target.url`: The target URL in string. The password in URL will be masked.
+  * `arg.target.username`: The username contained in the URL.
+  * `arg.target.password()`: A function to get the password contained in the URL.
+  * `arg.target.query`: A table contains query values.
+  * `arg.target.fragment`: The fragment text in string.
+
+- `arg.debug`: `true` if the `--debug` flag passed.
+
+- `arg.head`: `true` if the `--head` flag passed.
+
+- `argrecording`: `true` if `--gif` flag passed.
 
 
 Tab

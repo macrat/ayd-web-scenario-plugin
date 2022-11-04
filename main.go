@@ -25,22 +25,27 @@ func ParseTargetURL(s string) (*ayd.URL, error) {
 	if u.Scheme == "" {
 		u.Scheme = "web-scenario"
 	}
-	if u.Opaque == "" {
-		u.Opaque = u.Path
-		u.Path = ""
+	if u.User != nil {
+		u.Host = ""
+		u.Path = filepath.ToSlash(u.Path)
+	} else {
+		if u.Opaque == "" {
+			u.Opaque = u.Path
+			u.Path = ""
+		}
+		u.Host = ""
+		u.Opaque = filepath.ToSlash(u.Opaque)
 	}
-	u.Host = ""
-	u.Opaque = filepath.ToSlash(u.Opaque)
 	return u, nil
 }
 
 func main() {
-	var opts webscenario.Options
+	var arg webscenario.Arg
 
 	flags := pflag.NewFlagSet("ayd-web-scenario-plugin", pflag.ContinueOnError)
-	flags.BoolVar(&opts.Debug, "debug", false, "enable debug mode.")
-	flags.BoolVar(&opts.Head, "head", false, "show browser window while execution.")
-	flags.BoolVar(&opts.Recording, "gif", false, "enable recording animation gif.")
+	flags.BoolVar(&arg.Debug, "debug", false, "enable debug mode.")
+	flags.BoolVar(&arg.Head, "head", false, "show browser window while execution.")
+	flags.BoolVar(&arg.Recording, "gif", false, "enable recording animation gif.")
 	showVersion := flags.BoolP("version", "v", false, "show version and exit.")
 	showHelp := flags.BoolP("help", "h", false, "show help message and exit.")
 
@@ -62,6 +67,8 @@ func main() {
 		return
 	}
 
+	arg.Args = flags.Args()[1:]
+
 	if *cpuprofile != "" {
 		f, err := os.Create(*cpuprofile)
 		if err != nil {
@@ -75,14 +82,14 @@ func main() {
 	}
 
 	var err error
-	opts.Target, err = ParseTargetURL(flags.Arg(0))
+	arg.Target, err = ParseTargetURL(flags.Arg(0))
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		fmt.Fprintf(os.Stderr, "\nPlease see `%s -h` for more information.\n", os.Args[0])
 		os.Exit(2)
 	}
 
-	opts.Timeout = 50 * time.Minute
-	rec := webscenario.Run(opts)
-	ayd.NewLogger(opts.Target).Print(rec)
+	arg.Timeout = 50 * time.Minute
+	rec := webscenario.Run(arg)
+	ayd.NewLogger(arg.Target).Print(rec)
 }

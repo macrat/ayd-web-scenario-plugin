@@ -23,7 +23,7 @@ type Environment struct {
 	EnableRecording bool
 }
 
-func NewEnvironment(ctx context.Context, logger *Logger, s *Storage) *Environment {
+func NewEnvironment(ctx context.Context, logger *Logger, s *Storage, arg Arg) *Environment {
 	L := lua.NewState()
 	L.SetContext(ctx)
 
@@ -41,6 +41,7 @@ func NewEnvironment(ctx context.Context, logger *Logger, s *Storage) *Environmen
 	RegisterAssert(L)
 	RegisterKey(L)
 	RegisterEncodings(env)
+	arg.Register(L)
 
 	return env
 }
