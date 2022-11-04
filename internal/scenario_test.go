@@ -180,7 +180,7 @@ func Test_testSenarios(t *testing.T) {
 		t.Run(b, func(t *testing.T) {
 			t.Parallel()
 
-			s, err := NewStorage(t.TempDir(), p, time.Now())
+			s, err := NewStorage(t.TempDir(), time.Now())
 			if err != nil {
 				t.Fatalf("failed to prepare storage: %s", err)
 			}

@@ -19,14 +19,8 @@ type Storage struct {
 	autoid    int
 }
 
-func NewStorage(basedir, scriptPath string, timestamp time.Time) (*Storage, error) {
-	if basedir == "" {
-		basedir = filepath.Dir(scriptPath)
-	}
-
-	name := filepath.Base(scriptPath)
-	name = name[:len(name)-len(filepath.Ext(name))]
-	dir := filepath.Join(basedir, name, timestamp.Format("20060102T150405"))
+func NewStorage(baseDir string, timestamp time.Time) (*Storage, error) {
+	dir := filepath.Join(baseDir, timestamp.Format("20060102T150405"))
 
 	if !filepath.IsAbs(dir) {
 		cwd, err := os.Getwd()

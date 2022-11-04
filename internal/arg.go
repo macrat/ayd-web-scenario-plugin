@@ -1,6 +1,7 @@
 package webscenario
 
 import (
+	"path/filepath"
 	"time"
 
 	"github.com/macrat/ayd/lib-ayd"
@@ -17,9 +18,27 @@ type Arg struct {
 	Recording bool
 }
 
+func (a Arg) ArtifactDir(basedir string) string {
+	if a.Mode == "repl" || a.Mode == "stdin" {
+		return filepath.Join(basedir, "out")
+	}
+
+	path := a.Target.Path
+	if a.Target.Opaque != "" {
+		path = a.Target.Opaque
+	}
+
+	if basedir == "" {
+		return filepath.Clean(path[:len(path)-len(filepath.Ext(path))])
+	} else {
+		name := filepath.Base(path[:len(path)-len(filepath.Ext(path))])
+		return filepath.Join(basedir, name)
+	}
+}
+
 func (a Arg) Path() string {
 	if a.Mode == "repl" || a.Mode == "stdin" {
-		return "out"
+		return "<stdin>"
 	} else if a.Target.Opaque != "" {
 		return a.Target.Opaque
 	} else {

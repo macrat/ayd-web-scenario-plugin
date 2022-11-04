@@ -101,7 +101,7 @@ func Run(arg Arg) ayd.Record {
 	}
 
 	baseDir := os.Getenv("WEBSCENARIO_ARTIFACT_DIR")
-	storage, err := NewStorage(baseDir, arg.Path(), timestamp)
+	storage, err := NewStorage(arg.ArtifactDir(baseDir), timestamp)
 	if err != nil {
 		return ayd.Record{
 			Time:    timestamp,
