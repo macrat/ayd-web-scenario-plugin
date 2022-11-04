@@ -24,13 +24,21 @@ Arg
   * `arg.target.query`: A table contains query values.
   * `arg.target.fragment`: The fragment text in string.
 
+- `arg.alert`: Alerting information. It exists only if it used as alert plugin.
+  * `time`: Timestamp in milliseconds.
+  * `status`: Status text.
+  * `latency`: Probe latency in milliseconds.
+  * `target`: Target URL of the probe.
+  * `message`: Message string from the probe.
+  * `extra`: Extra values the probe reported.
+
 - `arg.mode`: `"ayd"`, `"standalone"`, `"repl"`, or `"stdin"`.
 
 - `arg.debug`: `true` if the `--debug` flag passed.
 
 - `arg.head`: `true` if the `--head` flag passed.
 
-- `argrecording`: `true` if `--gif` flag passed.
+- `arg.recording`: `true` if `--gif` flag passed.
 
 
 Tab

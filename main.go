@@ -88,7 +88,8 @@ func main() {
 		fmt.Println("  $ ayd-web-scenario [OPTIONS] - [ARGS...]")
 		fmt.Println()
 		fmt.Println("Ayd plugin mode:")
-		fmt.Println("  $ ayd-web-scenario TARGET_URL")
+		fmt.Println("  $ ayd-web-scenario URL")
+		fmt.Println("  $ ayd-web-scenario URL TIMESTAMP STATUS LATENCY TARGET_URL MESSAGE EXTRA")
 		fmt.Println()
 		fmt.Println("OPTIONS")
 		flags.PrintDefaults()
@@ -110,13 +111,28 @@ func main() {
 	if flags.NArg() == 0 {
 		arg.Mode, arg.Target, _ = ParseTargetURL("-")
 	} else {
-		arg.Args = flags.Args()[1:]
-
 		var err error
 		arg.Mode, arg.Target, err = ParseTargetURL(flags.Arg(0))
 		if err != nil {
-			fmt.Fprintln(os.Stderr, err)
-			fmt.Fprintf(os.Stderr, "\nPlease see `%s -h` for more information.\n", os.Args[0])
+			fmt.Fprintf(os.Stderr, "%s\nPlease see `%s -h` for more information.\n", err, os.Args[0])
+			os.Exit(2)
+		}
+		if arg.Mode != "ayd" {
+			arg.Args = flags.Args()[1:]
+		} else if len(flags.Args()) == 7 {
+			if as, err := ayd.ParseAlertPluginArgsFrom(append([]string{os.Args[0]}, flags.Args()...)); err != nil {
+				fmt.Fprintf(os.Stderr, "%s\nPlease see `%s -h` for more information.\n", err, os.Args[0])
+				os.Exit(2)
+			} else {
+				arg.Alert.Time = as.Time
+				arg.Alert.Status = as.Status
+				arg.Alert.Latency = as.Latency
+				arg.Alert.Target = as.TargetURL
+				arg.Alert.Message = as.Message
+				arg.Alert.Extra = as.Extra
+			}
+		} else if len(flags.Args()) != 1 {
+			fmt.Fprintf(os.Stderr, "1 or 7 arguments required in Ayd mode.\nPlease see `%s -h` for more information.\n", os.Args[0])
 			os.Exit(2)
 		}
 	}

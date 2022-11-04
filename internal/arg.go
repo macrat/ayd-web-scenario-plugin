@@ -12,6 +12,7 @@ type Arg struct {
 	Mode      string
 	Args      []string
 	Target    *ayd.URL
+	Alert     ayd.Record
 	Timeout   time.Duration
 	Debug     bool
 	Head      bool
@@ -83,6 +84,17 @@ func (a Arg) Register(L *lua.LState) {
 	L.SetField(tbl, "debug", lua.LBool(a.Debug))
 	L.SetField(tbl, "head", lua.LBool(a.Head))
 	L.SetField(tbl, "recording", lua.LBool(a.Recording))
+
+	if a.Alert.Target != nil {
+		ar := L.NewTable()
+		L.SetField(ar, "time", lua.LNumber(a.Alert.Time.UnixMilli()))
+		L.SetField(ar, "status", lua.LString(a.Alert.Status.String()))
+		L.SetField(ar, "latency", lua.LNumber(float64(a.Alert.Latency.Microseconds())/1000.0))
+		L.SetField(ar, "target", lua.LString(a.Alert.Target.String()))
+		L.SetField(ar, "message", lua.LString(a.Alert.Message))
+		L.SetField(ar, "extra", PackLValue(L, a.Alert.Extra))
+		L.SetField(tbl, "alert", ar)
+	}
 
 	L.SetGlobal("arg", tbl)
 }
