@@ -2,7 +2,6 @@ package webscenario
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"os/signal"
@@ -10,7 +9,6 @@ import (
 
 	"github.com/chromedp/chromedp"
 	"github.com/macrat/ayd/lib-ayd"
-	"github.com/yuin/gopher-lua"
 )
 
 func NewExecAllocator(ctx context.Context, withHead bool) (context.Context, context.CancelFunc) {
@@ -48,10 +46,20 @@ func NewExecAllocator(ctx context.Context, withHead bool) (context.Context, cont
 	return chromedp.NewExecAllocator(ctx, opts...)
 }
 
-func NewContext(timeout time.Duration, withHead bool, debuglog *ayd.Logger) (context.Context, context.CancelFunc) {
-	ctx, stopTimeout := context.WithTimeout(context.Background(), timeout)
-	ctx, stopNotify := signal.NotifyContext(ctx, os.Interrupt)
-	ctx, stopAllocator := NewExecAllocator(ctx, withHead)
+func NewContext(arg Arg, debuglog *ayd.Logger) (context.Context, context.CancelFunc) {
+	ctx := context.Background()
+
+	stopTimeout := func() {}
+	if arg.Timeout > 0 {
+		ctx, stopTimeout = context.WithTimeout(ctx, arg.Timeout)
+	}
+
+	stopNotify := func() {}
+	if arg.Mode != "repl" {
+		ctx, stopNotify = signal.NotifyContext(ctx, os.Interrupt)
+	}
+
+	ctx, stopAllocator := NewExecAllocator(ctx, arg.Head)
 
 	var opts []chromedp.ContextOption
 	if debuglog != nil {
@@ -88,12 +96,12 @@ func Run(arg Arg) ayd.Record {
 	timestamp := time.Now()
 
 	logger := &Logger{Status: ayd.StatusHealthy, Debug: arg.Debug}
-	if arg.Mode == "standalone" {
+	if arg.Mode != "ayd" {
 		logger.Stream = os.Stdout
 	}
 
 	baseDir := os.Getenv("WEBSCENARIO_ARTIFACT_DIR")
-	storage, err := NewStorage(baseDir, arg.Target.Opaque, timestamp)
+	storage, err := NewStorage(baseDir, arg.Path(), timestamp)
 	if err != nil {
 		return ayd.Record{
 			Time:    timestamp,
@@ -117,35 +125,26 @@ func Run(arg Arg) ayd.Record {
 		browserlog = &l
 	}
 
-	ctx, cancel := NewContext(arg.Timeout, arg.Head, browserlog)
+	ctx, cancel := NewContext(arg, browserlog)
 	defer cancel()
 
 	env := NewEnvironment(ctx, logger, storage, arg)
 	env.EnableRecording = arg.Recording
 
-	stime := time.Now()
-	err = env.DoFile(arg.Target.Opaque)
-	latency := time.Since(stime)
+	var latency time.Duration
+	switch arg.Mode {
+	case "repl":
+		err = env.DoREPL(ctx)
+	case "stdin":
+		err = env.DoStream(os.Stdin, "<stdin>")
+	default:
+		stime := time.Now()
+		err = env.DoFile(arg.Path())
+		latency = time.Since(stime)
+	}
 
 	env.Close()
-
-	if err != nil {
-		logger.Status = ayd.StatusFailure
-
-		var apierr *lua.ApiError
-		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-			logger.SetExtra("error", "timeout")
-			logger.Status = ayd.StatusAborted
-		} else if errors.Is(ctx.Err(), context.Canceled) {
-			logger.SetExtra("error", "interrupted")
-			logger.Status = ayd.StatusAborted
-		} else if errors.As(err, &apierr) {
-			logger.SetExtra("error", apierr.Object.String())
-			logger.SetExtra("trace", apierr.StackTrace)
-		} else {
-			logger.SetExtra("error", err.Error())
-		}
-	}
+	logger.HandleError(ctx, err)
 
 	if xs := storage.Artifacts(); len(xs) > 0 {
 		logger.SetExtra("artifacts", xs)

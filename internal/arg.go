@@ -17,6 +17,16 @@ type Arg struct {
 	Recording bool
 }
 
+func (a Arg) Path() string {
+	if a.Mode == "repl" {
+		return "repl"
+	} else if a.Target.Opaque != "" {
+		return a.Target.Opaque
+	} else {
+		return a.Target.Path
+	}
+}
+
 func URLToTable(L *lua.LState, u *ayd.URL) *lua.LTable {
 	tbl := L.NewTable()
 

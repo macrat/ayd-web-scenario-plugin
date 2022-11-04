@@ -166,7 +166,7 @@ func Test_testSenarios(t *testing.T) {
 	server := StartTestServer()
 	t.Cleanup(server.Close)
 
-	ctx, cancel := NewContext(5*time.Minute, false, nil)
+	ctx, cancel := NewContext(Arg{Mode: "ayd", Timeout: 5 * time.Minute}, nil)
 	t.Cleanup(cancel)
 
 	target, _ := ayd.ParseURL("web-scenario://foo:bar@/dummy/script.lua?hello=world&hoge=fuga#piyo")
@@ -186,7 +186,7 @@ func Test_testSenarios(t *testing.T) {
 			}
 
 			logger := &Logger{Stream: (*DebugWriter)(t)}
-			env := NewEnvironment(ctx, logger, s, Arg{Args: []string{"abc", "def"}, Target: target})
+			env := NewEnvironment(ctx, logger, s, Arg{Mode: "ayd", Args: []string{"abc", "def"}, Target: target})
 			defer env.Close()
 
 			RegisterTestUtil(env.lua, s, server)

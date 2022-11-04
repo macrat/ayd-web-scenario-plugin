@@ -108,6 +108,7 @@ func TestRun(t *testing.T) {
 			t.Setenv("TEST_ERROR", tt.Error)
 
 			r := Run(Arg{
+				Mode:    "ayd",
 				Target:  &ayd.URL{Scheme: "web-scenario", Opaque: "./testdata/_main-test.lua"},
 				Timeout: 5 * time.Minute,
 			})
@@ -132,6 +133,7 @@ func TestRun(t *testing.T) {
 
 	t.Run("timeout", func(t *testing.T) {
 		r := Run(Arg{
+			Mode:    "ayd",
 			Target:  &ayd.URL{Scheme: "web-scenario", Opaque: "./testdata/_timeout-test.lua"},
 			Timeout: 500 * time.Millisecond,
 		})

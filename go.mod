@@ -5,6 +5,7 @@ go 1.19
 require (
 	github.com/chromedp/cdproto v0.0.0-20221029224954-108014bf7279
 	github.com/chromedp/chromedp v0.8.6
+	github.com/chzyer/readline v0.0.0-20180603132655-2972be24d48e
 	github.com/google/go-cmp v0.5.6
 	github.com/macrat/ayd v0.15.0
 	github.com/spf13/pflag v1.0.5

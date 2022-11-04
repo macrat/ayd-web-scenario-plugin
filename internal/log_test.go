@@ -23,7 +23,7 @@ func TestRegisterLogger(t *testing.T) {
 		{`print(1)`, []string{"1"}},
 		{`print(2, 4, 8); print(16)`, []string{"[2,4,8]", "16"}},
 		{`print("hello", 123)`, []string{`["hello",123]`}},
-		{`print(); print()`, []string{}},
+		{`print(); print()`, []string{"", ""}},
 	}
 
 	for _, tt := range tests {

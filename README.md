@@ -32,10 +32,12 @@ assert.eq(t("h1").text, "welcome test-id!")
 
 Please see also [reference](reference.md) for more information about features you can use in the scenario.
 
+You can use REPL mode for testing how to write scenario. Please execute `ayd-web-scenario` without any argument.
+
 ### 3. Test scenario in standalone mode
 
 If you passed file path instead of URL, web-scenario works in the standalone mode that shows logs more readable style.
-You can use `--debug` flag for get more detail information.
+You can use `--head` flag for check what is going on on the window, and/or `--debug` flag for get more detail information.
 
 ``` shell
 $ ayd-web-scenario /path/to/scenario.lua
@@ -43,7 +45,7 @@ $ ayd-web-scenario /path/to/scenario.lua
 
 ### 4. Schedule using Ayd
 
-You can use web-scenario as a plugin of Ayd for monitoring web services.
+You can use Web-Scenario as a plugin of Ayd for monitoring web services.
 
 ``` shell
 $ ayd web-scenario:/path/to/scenario.lua

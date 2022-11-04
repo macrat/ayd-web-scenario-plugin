@@ -7,6 +7,7 @@ import (
 	"runtime/pprof"
 	"time"
 
+	"github.com/chzyer/readline"
 	"github.com/macrat/ayd-web-scenario-plugin/internal"
 	"github.com/macrat/ayd/lib-ayd"
 	"github.com/spf13/pflag"
@@ -17,7 +18,16 @@ var (
 	Commit  = "UNKNOWN"
 )
 
+func init() {
+	webscenario.Version = Version
+	webscenario.Commit = Commit
+}
+
 func ParseTargetURL(s string) (mode string, url *ayd.URL, err error) {
+	if s == "-" {
+		return "repl", &ayd.URL{Scheme: "web-scenario", Opaque: "<stdin>"}, nil
+	}
+
 	u, err := ayd.ParseURL(s)
 	if err != nil {
 		return "", nil, err
@@ -67,13 +77,23 @@ func main() {
 	case *showVersion:
 		fmt.Printf("Ayd WebScenaro plugin %s (%s)\n", Version, Commit)
 		return
-	case *showHelp || len(flags.Args()) != 1:
-		fmt.Println("$ ayd-web-scenario-plugin [OPTIONS] TARGET_URL|FILE\n\nOptions:")
+	case *showHelp:
+		fmt.Println("Ayd Web-Scenario")
+		fmt.Println()
+		fmt.Println("Standalone mode:")
+		fmt.Println("  $ ayd-web-scenario [OPTIONS] FILE [ARGS...]")
+		fmt.Println()
+		fmt.Println("REPL mode:")
+		fmt.Println("  $ ayd-web-scenario [OPTIONS]")
+		fmt.Println("  $ ayd-web-scenario [OPTIONS] - [ARGS...]")
+		fmt.Println()
+		fmt.Println("Ayd plugin mode:")
+		fmt.Println("  $ ayd-web-scenario TARGET_URL")
+		fmt.Println()
+		fmt.Println("OPTIONS")
 		flags.PrintDefaults()
 		return
 	}
-
-	arg.Args = flags.Args()[1:]
 
 	if *cpuprofile != "" {
 		f, err := os.Create(*cpuprofile)
@@ -87,15 +107,29 @@ func main() {
 		defer pprof.StopCPUProfile()
 	}
 
-	var err error
-	arg.Mode, arg.Target, err = ParseTargetURL(flags.Arg(0))
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		fmt.Fprintf(os.Stderr, "\nPlease see `%s -h` for more information.\n", os.Args[0])
-		os.Exit(2)
+	if flags.NArg() == 0 {
+		arg.Mode, arg.Target, _ = ParseTargetURL("-")
+	} else {
+		arg.Args = flags.Args()[1:]
+
+		var err error
+		arg.Mode, arg.Target, err = ParseTargetURL(flags.Arg(0))
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			fmt.Fprintf(os.Stderr, "\nPlease see `%s -h` for more information.\n", os.Args[0])
+			os.Exit(2)
+		}
 	}
 
-	arg.Timeout = 50 * time.Minute
+	switch arg.Mode {
+	case "ayd":
+		arg.Timeout = 50 * time.Minute
+	case "repl":
+		if !readline.DefaultIsTerminal() {
+			arg.Mode = "stdin"
+		}
+	}
+
 	rec := webscenario.Run(arg)
 	if arg.Mode == "ayd" {
 		ayd.NewLogger(arg.Target).Print(rec)

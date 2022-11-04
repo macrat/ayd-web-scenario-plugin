@@ -5,20 +5,23 @@ import (
 	"errors"
 	"fmt"
 	"sync"
-	"sync/atomic"
 
 	"github.com/yuin/gopher-lua"
+)
+
+var (
+	Version = "HEAD"
+	Commit  = "UNKNOWN"
 )
 
 type Environment struct {
 	sync.Mutex // this mutex works like the GIL in Python.
 
-	lua      *lua.LState
-	tabs     []*Tab
-	logger   *Logger
-	storage  *Storage
-	saveWG   sync.WaitGroup
-	recordID atomic.Int64
+	lua     *lua.LState
+	tabs    []*Tab
+	logger  *Logger
+	storage *Storage
+	saveWG  sync.WaitGroup
 
 	EnableRecording bool
 }
@@ -131,12 +134,11 @@ func (env *Environment) RegisterNewType(name string, methods map[string]lua.LGFu
 	env.lua.SetGlobal(name, tbl)
 }
 
-func (env *Environment) saveRecord(recorder *Recorder) {
+func (env *Environment) saveRecord(id int, recorder *Recorder) {
 	env.saveWG.Add(1)
-	id := env.recordID.Add(1)
-	go func(id int64) {
+	go func(id int) {
 		<-recorder.Done
-		if f, err := env.storage.Open(fmt.Sprintf("record-%04d.gif", id)); err == nil {
+		if f, err := env.storage.Open(fmt.Sprintf("record%d.gif", id)); err == nil {
 			err = recorder.SaveTo(f)
 			f.Close()
 			if err == NoRecord {

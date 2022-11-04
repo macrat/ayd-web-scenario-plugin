@@ -52,6 +52,7 @@ type Tab struct {
 
 	loading *LoadWaiter
 
+	id            int
 	width, height int64
 	dialogEvent   *EventHandler
 	downloadEvent *EventHandler
@@ -61,7 +62,7 @@ type Tab struct {
 	recorder *Recorder
 }
 
-func NewTab(ctx context.Context, L *lua.LState, env *Environment) *Tab {
+func NewTab(ctx context.Context, L *lua.LState, env *Environment, id int) *Tab {
 	url := ""
 	width, height := int64(800), int64(800)
 	recording := false
@@ -92,8 +93,10 @@ func NewTab(ctx context.Context, L *lua.LState, env *Environment) *Tab {
 			cancel:  cancel,
 			env:     env,
 			loading: NewLoadWaiter(),
-			width:   width,
-			height:  height,
+
+			id:     id,
+			width:  width,
+			height: height,
 
 			dialogEvent:   NewEventHandler((*Tab).HandleDialog),
 			downloadEvent: NewEventHandler((*Tab).HandleEvent),
@@ -315,7 +318,7 @@ func (t *Tab) Close() error {
 		t.cancel()
 
 		if t.recorder != nil {
-			t.env.saveRecord(t.recorder)
+			t.env.saveRecord(t.id, t.recorder)
 		}
 
 		t.dialogEvent.Close()
@@ -574,9 +577,12 @@ func RegisterTabType(ctx context.Context, env *Environment) {
 		"responses": (*Tab).GetResponse,
 	}
 
+	count := 0
+
 	env.RegisterNewType("tab", map[string]lua.LGFunction{
 		"new": func(L *lua.LState) int {
-			t := NewTab(ctx, L, env)
+			count++
+			t := NewTab(ctx, L, env, count)
 			env.registerTab(t)
 			L.Push(t.ToLua(L))
 			return 1
@@ -598,10 +604,7 @@ func RegisterTabType(ctx context.Context, env *Environment) {
 			}
 		},
 		"__tostring": func(L *lua.LState) int {
-			var url, title string
-			t := CheckTab(L)
-			t.Run(L, "tostring($)", false, 0, chromedp.Location(&url), chromedp.Title(&title))
-			L.Push(lua.LString("[" + title + "](" + url + ")"))
+			L.Push(lua.LString(fmt.Sprintf("tab#%d", CheckTab(L).id)))
 			return 1
 		},
 	}, nil)
