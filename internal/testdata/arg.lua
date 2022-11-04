@@ -8,6 +8,7 @@ assert.eq(arg, {
         query    = {hello="world", hoge="fuga"},
         fragment = "piyo",
     },
+    mode      = "ayd",
     debug     = false,
     head      = false,
     recording = false,

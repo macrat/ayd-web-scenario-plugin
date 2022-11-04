@@ -24,6 +24,8 @@ Arg
   * `arg.target.query`: A table contains query values.
   * `arg.target.fragment`: The fragment text in string.
 
+- `arg.mode`: `"ayd"`, `"standalone"`, `"repl"`, or `"stdin"`.
+
 - `arg.debug`: `true` if the `--debug` flag passed.
 
 - `arg.head`: `true` if the `--head` flag passed.

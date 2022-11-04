@@ -78,6 +78,7 @@ func (a Arg) Register(L *lua.LState) {
 		tbl.Append(lua.LString(x))
 	}
 
+	L.SetField(tbl, "mode", lua.LString(a.Mode))
 	L.SetField(tbl, "target", URLToTable(L, a.Target))
 	L.SetField(tbl, "debug", lua.LBool(a.Debug))
 	L.SetField(tbl, "head", lua.LBool(a.Head))
