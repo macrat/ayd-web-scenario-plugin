@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/chzyer/readline"
-	"github.com/macrat/ayd-web-scenario-plugin/internal"
+	"github.com/macrat/ayd-web-scenario/internal"
 	"github.com/macrat/ayd/lib-ayd"
 	"github.com/spf13/pflag"
 )

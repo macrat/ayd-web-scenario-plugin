@@ -1,4 +1,4 @@
-module github.com/macrat/ayd-web-scenario-plugin
+module github.com/macrat/ayd-web-scenario
 
 go 1.19
 

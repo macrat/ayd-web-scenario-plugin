@@ -1,5 +1,5 @@
-Ayd Web-Scenario plugin
-=======================
+Ayd Web-Scenario
+================
 
 A headless browser controller for [Ayd](https://github.com/macrat/ayd) status monitoring tool.
 
@@ -11,7 +11,7 @@ A headless browser controller for [Ayd](https://github.com/macrat/ayd) status mo
 
 ### 1. Install
 
-~~Download a plugin binary from [release page](https://github.com/macrat/ayd-web-scenario-plugin/releases).~~ (pre built binary is not yet released)
+~~Download a plugin binary from [release page](https://github.com/macrat/ayd-web-scenario/releases).~~ (pre built binary is not yet released)
 And place binary to some directory that is included in PATH environment variable.
 
 ### 2. Make a scenario
