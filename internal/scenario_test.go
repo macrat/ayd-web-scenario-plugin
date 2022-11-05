@@ -2,6 +2,7 @@ package webscenario
 
 import (
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -129,6 +130,37 @@ func StartTestServer() *httptest.Server {
 	mux.HandleFunc("/download/data.txt", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("content-type", "application/octet-stream")
 		fmt.Fprintf(w, `this is a data`)
+	})
+
+	mux.HandleFunc("/header", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintf(w, "%s %q", r.Method, r.Header.Get("X-Header-Test"))
+	})
+	mux.HandleFunc("/echo", func(w http.ResponseWriter, r *http.Request) {
+		io.Copy(w, r.Body)
+	})
+	mux.HandleFunc("/cookie/set", func(w http.ResponseWriter, r *http.Request) {
+		http.SetCookie(w, &http.Cookie{
+			Name:  "cookie_test",
+			Value: "hello world",
+		})
+		fmt.Fprint(w, "ok")
+	})
+	mux.HandleFunc("/cookie/get", func(w http.ResponseWriter, r *http.Request) {
+		c, err := r.Cookie("cookie_test")
+		if err != nil {
+			fmt.Fprint(w, "not set")
+		} else {
+			fmt.Fprint(w, c.Value)
+		}
+	})
+
+	mux.HandleFunc("/error", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+		fmt.Fprint(w, "something wrong!")
+	})
+	mux.HandleFunc("/slow", func(w http.ResponseWriter, r *http.Request) {
+		time.Sleep(100 * time.Millisecond)
+		fmt.Fprint(w, "ok")
 	})
 
 	return httptest.NewServer(mux)

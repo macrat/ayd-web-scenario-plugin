@@ -44,6 +44,7 @@ func NewEnvironment(ctx context.Context, logger *Logger, s *Storage, arg Arg) *E
 	RegisterAssert(L)
 	RegisterKey(L)
 	RegisterEncodings(env)
+	RegisterFetch(ctx, env)
 	arg.Register(L)
 
 	return env

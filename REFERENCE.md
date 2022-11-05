@@ -6,6 +6,7 @@ The Web-Scenario's script is based on the Lua 5.1 ([GopherLua](https://github.co
 - [arg](#arg): Read argument and options to this execution.
 - [tab](#tab): Open, handle, and close browser tab.
 - [element](#element): Read and control HTML element.
+- [fetch](#fetch): Communicate via HTTP, without browser.
 - [print](#print): Report and store information.
 - [assert](#assert): Assertion test values.
 - [time](#time): Get or wait time.
@@ -377,6 +378,33 @@ Please see also [`tab(query)`](#tabquery).
 
 Get [element](#element)s table from children of this element.
 Please see also [`tab:all(query)`](#taballquery).
+
+
+Fetch
+-----
+
+#### `fetch(url, [options])`
+
+Send HTTP/HTTPS request to `url`, and wait for response.
+
+The `options` is a table and can have below fields.
+
+- `method`: HTTP method in string such as `"GET"` or `"POST"`. The default is `"GET"` normally, but it is `"POST"` if set non-nil value to `body`.
+- `headers`: A table that contains header key-values.
+- `body`: The body value for POST or PUT method. It is a string, a number, or an iterator function that returns each lines in string.
+- `timeout`: Timeout duration in millisecond. The default is 5 minutes.
+
+The first return value is a table that response from the server, contains below fields.
+
+- `url`: URL of this resource.
+- `status`: HTTP response status like `200` for OK.
+- `headers`: HTTP headers server sent.
+- `length`: The transfered length in bytes.
+- `read`: A function for read the response body.
+- `cookiejar`: Cookie store to continue session from previous fetch.
+
+The second return value is a cookie jar that holds all cookies set while the fetch.
+You can read cookies for specific URL using `get(url)` method, or all cookies using `all()` method.
 
 
 Print

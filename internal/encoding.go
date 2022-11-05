@@ -190,6 +190,16 @@ type iterReader struct {
 	Fn   func() lua.LValue
 }
 
+func newReaderFromLFunction(L *lua.LState, f *lua.LFunction) *iterReader {
+	return &iterReader{
+		Fn: func() lua.LValue {
+			L.Push(f)
+			L.Call(0, 1)
+			return L.Get(-1)
+		},
+	}
+}
+
 func (ir *iterReader) Read(p []byte) (n int, err error) {
 	if ir.done {
 		return 0, io.EOF
@@ -227,13 +237,7 @@ func checkReader(L *lua.LState, index int) io.Reader {
 			Fn: iiter(x),
 		}
 	case *lua.LFunction:
-		r = &iterReader{
-			Fn: func() lua.LValue {
-				L.Push(x)
-				L.Call(0, 1)
-				return L.Get(-1)
-			},
-		}
+		r = newReaderFromLFunction(L, x)
 	default:
 		L.ArgError(1, "string, table, or iterator function expected.")
 	}
