@@ -41,7 +41,9 @@ func RegisterFileLike(L *lua.LState) {
 
 			L.Push(L.NewFunction(func(L *lua.LState) int {
 				buf, _, err := r.ReadLine()
-				if err != nil {
+				if err == io.EOF {
+					return 0
+				} else if err != nil {
 					L.RaiseError("%s", err)
 				}
 				L.Push(lua.LString(buf))
@@ -68,19 +70,25 @@ func RegisterFileLike(L *lua.LState) {
 					case "n":
 						var buf float64
 						_, err := fmt.Fscanf(r, "%f", &buf)
-						if err != nil {
+						if err == io.EOF {
+							return i - 2
+						} else if err != nil {
 							L.RaiseError("%s", err)
 						}
 						L.Push(lua.LNumber(buf))
 					case "a":
 						buf, err := io.ReadAll(r)
-						if err != nil {
+						if err == io.EOF {
+							return i - 2
+						} else if err != nil {
 							L.RaiseError("%s", err)
 						}
 						L.Push(lua.LString(buf))
 					case "l", "L", "":
 						buf, _, err := r.ReadLine()
-						if err != nil {
+						if err == io.EOF {
+							return i - 2
+						} else if err != nil {
 							L.RaiseError("%s", err)
 						}
 						if format[:1] == "L" {
@@ -93,7 +101,9 @@ func RegisterFileLike(L *lua.LState) {
 				case lua.LNumber:
 					buf := make([]byte, int(format))
 					_, err := r.Read(buf)
-					if err != nil {
+					if err == io.EOF {
+						return i - 2
+					} else if err != nil {
 						L.RaiseError("%s", err)
 					}
 					L.Push(lua.LString(buf))

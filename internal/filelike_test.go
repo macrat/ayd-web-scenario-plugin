@@ -38,6 +38,9 @@ func TestAsFileLikeMeta(t *testing.T) {
 		{"return f:lines()(), f:read()", []lua.LValue{lua.LString("123hello world"), lua.LString("foo bar")}},
 		{"return f:lines()(), f:lines()()", []lua.LValue{lua.LString("123hello world"), lua.LString("foo bar")}},
 		{"l = f:lines(); return l(), l()", []lua.LValue{lua.LString("123hello world"), lua.LString("foo bar")}},
+
+		{"return f:read(), f:read('a'), f:read(), f:read()", []lua.LValue{lua.LString("123hello world"), lua.LString("foo bar\nbaz\n"), lua.LNil}},
+		{"return f:read(), f:read('a'), f:lines()(), f:lines()()", []lua.LValue{lua.LString("123hello world"), lua.LString("foo bar\nbaz\n"), lua.LNil}},
 	}
 
 	RegisterFileLike(L)
