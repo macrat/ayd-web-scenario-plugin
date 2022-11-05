@@ -43,6 +43,7 @@ func NewEnvironment(ctx context.Context, logger *Logger, s *Storage, arg Arg) *E
 	RegisterTime(ctx, env)
 	RegisterAssert(L)
 	RegisterKey(L)
+	RegisterFileLike(L)
 	RegisterEncodings(env)
 	RegisterFetch(ctx, env)
 	arg.Register(L)

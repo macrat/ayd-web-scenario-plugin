@@ -1,6 +1,7 @@
 package webscenario
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -61,17 +62,14 @@ func PackFetchHeader(L *lua.LState, h http.Header) lua.LValue {
 	return tbl
 }
 
-func PackFetchResponse(env *Environment, L *lua.LState, resp *http.Response, body []byte) lua.LValue {
+func PackFetchResponse(env *Environment, L *lua.LState, resp *http.Response, body io.Reader) lua.LValue {
 	tbl := L.NewTable()
+	L.SetMetatable(tbl, AsFileLikeMeta(L, body))
 
 	L.SetField(tbl, "url", lua.LString(resp.Request.URL.String()))
 	L.SetField(tbl, "status", lua.LNumber(resp.StatusCode))
 	L.SetField(tbl, "headers", PackFetchHeader(L, resp.Header))
 	L.SetField(tbl, "length", lua.LNumber(resp.ContentLength))
-	L.SetField(tbl, "read", L.NewFunction(func(L *lua.LState) int {
-		L.Push(lua.LString(body))
-		return 1
-	}))
 
 	return tbl
 }
@@ -291,7 +289,7 @@ func RegisterFetch(ctx context.Context, env *Environment) {
 		})
 		env.HandleError(ret.Err)
 
-		L.Push(PackFetchResponse(env, L, ret.Resp, ret.Body))
+		L.Push(PackFetchResponse(env, L, ret.Resp, bytes.NewReader(ret.Body)))
 		L.Push(cookiejar.ToLua(L))
 
 		return 2

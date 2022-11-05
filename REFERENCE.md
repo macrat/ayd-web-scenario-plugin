@@ -400,7 +400,8 @@ The first return value is a table that response from the server, contains below 
 - `status`: HTTP response status like `200` for OK.
 - `headers`: HTTP headers server sent.
 - `length`: The transfered length in bytes.
-- `read`: A function for read the response body.
+- `read`: A method for read the response body. This is the same usage as [`file:read`](https://www.lua.org/manual/5.1/manual.html#pdf-file:read)
+- `lines`: A method to make an iterator function to read body.
 - `cookiejar`: Cookie store to continue session from previous fetch.
 
 The second return value is a cookie jar that holds all cookies set while the fetch.

@@ -10,10 +10,9 @@ assert.eq(
         url    = TEST.url("/header"),
         status = 200,
         length = 6,
-        read   = resp.read,
     }
 )
-assert.eq(resp:read(), [[GET ""]])
+assert.eq(resp:read("*all"), [[GET ""]])
 
 
 resp = fetch(TEST.url("/header"), {method="POST", headers={["X-Header-Test"]="hello world"}})
@@ -28,22 +27,21 @@ assert.eq(
         url    = TEST.url("/header"),
         status = 200,
         length = 18,
-        read   = resp.read,
     }
 )
 assert.eq(
-    resp:read(),
+    resp:read("*all"),
     [[POST "hello world"]]
 )
 
 
 resp = fetch(TEST.url("/echo"), {body="hello"})
 assert.eq(resp.status, 200)
-assert.eq(resp:read(), [[hello]])
+assert.eq(resp:read("*all"), [[hello]])
 
 resp = fetch(TEST.url("/echo"), {body=123})
 assert.eq(resp.status, 200)
-assert.eq(resp:read(), [[123]])
+assert.eq(resp:read("*all"), [[123]])
 
 reader_idx = 0
 function reader()
@@ -55,7 +53,7 @@ function reader()
 end
 resp = fetch(TEST.url("/echo"), {body=reader})
 assert.eq(resp.status, 200)
-assert.eq(resp:read(), "hello\nworld\n")
+assert.eq(resp:read("*all"), "hello\nworld\n")
 
 
 resp = fetch(TEST.url("/error"), {})
@@ -70,18 +68,17 @@ assert.eq(
         url    = TEST.url("/error"),
         status = 500,
         length = 16,
-        read   = resp.read,
     }
 )
 assert.eq(
-    resp:read(),
+    resp:read("*all"),
     [[something wrong!]]
 )
 
 
 ok, err = pcall(fetch, TEST.url("/slow"), {timeout=10*time.millisecond})
 assert.eq(ok, false)
-assert.eq(err, "testdata/fetch.lua:82: timeout")
+assert.eq(err, "testdata/fetch.lua:79: timeout")
 
 ok = pcall(fetch, TEST.url("/slow"), {timeout=500*time.millisecond})
 assert.eq(ok, true)
@@ -89,21 +86,21 @@ assert.eq(ok, true)
 
 resp, jar = fetch(TEST.url("/cookie/get"))
 assert.eq(resp.status, 200)
-assert.eq(resp:read(), "not set")
+assert.eq(resp:read("*all"), "not set")
 
 assert.eq(jar:all(), {})
 
 resp = fetch(TEST.url("/cookie/set"), {cookiejar=jar})
 assert.eq(resp.status, 200)
-assert.eq(resp:read(), "ok")
+assert.eq(resp:read("*all"), "ok")
 
 resp = fetch(TEST.url("/cookie/get"), {cookiejar=jar})
 assert.eq(resp.status, 200)
-assert.eq(resp:read(), "hello world")
+assert.eq(resp:read("*all"), "hello world")
 
 resp = fetch(TEST.url("/cookie/get"))
 assert.eq(resp.status, 200)
-assert.eq(resp:read(), "not set")
+assert.eq(resp:read("*all"), "not set")
 
 assert.eq(jar:all(), {
     [TEST.url("/cookie/set")] = {{
