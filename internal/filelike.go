@@ -22,7 +22,7 @@ func AsFileLikeMeta(L *lua.LState, r io.Reader) *lua.LTable {
 }
 
 func RegisterFileLike(L *lua.LState) {
-	checkFileReader := func() *bufio.Reader {
+	checkFileReader := func(L *lua.LState) *bufio.Reader {
 		ud, ok := L.GetField(L.Get(1), "_reader").(*lua.LUserData)
 		if !ok {
 			L.ArgError(1, "_reader field expected")
@@ -37,7 +37,7 @@ func RegisterFileLike(L *lua.LState) {
 	meta := L.NewTypeMetatable("filelike")
 	L.SetField(meta, "__index", L.SetFuncs(L.NewTable(), map[string]lua.LGFunction{
 		"lines": func(L *lua.LState) int {
-			r := checkFileReader()
+			r := checkFileReader(L)
 
 			L.Push(L.NewFunction(func(L *lua.LState) int {
 				buf, _, err := r.ReadLine()
@@ -50,7 +50,7 @@ func RegisterFileLike(L *lua.LState) {
 			return 1
 		},
 		"read": func(L *lua.LState) int {
-			r := checkFileReader()
+			r := checkFileReader(L)
 			n := L.GetTop()
 
 			if n == 1 {
@@ -105,4 +105,22 @@ func RegisterFileLike(L *lua.LState) {
 			return n - 1
 		},
 	}))
+}
+
+type DelayedReader struct {
+	open   func() io.Reader
+	reader io.Reader
+}
+
+func NewDelayedReader(f func() io.Reader) *DelayedReader {
+	return &DelayedReader{
+		open: f,
+	}
+}
+
+func (r *DelayedReader) Read(p []byte) (int, error) {
+	if r.reader == nil {
+		r.reader = r.open()
+	}
+	return r.reader.Read(p)
 }

@@ -1,9 +1,11 @@
 package webscenario
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"sync"
 	"time"
 
@@ -179,19 +181,15 @@ func (t *Tab) ToLua(L *lua.LState) *lua.LUserData {
 			L.SetField(ev, "remoteIP", lua.LString(e.Response.RemoteIPAddress))
 			L.SetField(ev, "remotePort", lua.LNumber(e.Response.RemotePort))
 			L.SetField(ev, "length", lua.LNumber(e.Response.EncodedDataLength))
-			L.SetField(ev, "body", t.env.NewFunction(func(L *lua.LState) int {
-				id, ok := L.GetField(L.CheckTable(1), "id").(lua.LString)
-				if !ok {
-					L.ArgError(1, "expected a table contains id.")
-				}
 
+			L.SetMetatable(ev, AsFileLikeMeta(L, NewDelayedReader(func() io.Reader {
 				var body []byte
-				t.Run(L, "$response:body()", false, 0, chromedp.ActionFunc(func(ctx context.Context) (err error) {
+				t.Run(L, "$response:read()", false, 0, chromedp.ActionFunc(func(ctx context.Context) (err error) {
 					ctx, cancel := context.WithTimeout(ctx, 1*time.Minute)
 					defer cancel()
 
-					t.loading.Wait(network.RequestID(id))
-					body, err = network.GetResponseBody(network.RequestID(id)).Do(ctx)
+					t.loading.Wait(e.RequestID)
+					body, err = network.GetResponseBody(e.RequestID).Do(ctx)
 					var cdperr *cdproto.Error
 					if errors.As(err, &cdperr) && cdperr.Code == -32000 {
 						// -32000 means "no data found"
@@ -200,13 +198,9 @@ func (t *Tab) ToLua(L *lua.LState) *lua.LUserData {
 					}
 					return err
 				}))
-				if body == nil {
-					L.Push(lua.LNil)
-				} else {
-					L.Push(lua.LString(string(body)))
-				}
-				return 1
-			}))
+				return bytes.NewReader(body)
+			})))
+
 			t.responseEvent.Invoke(t, ev)
 		}
 	})

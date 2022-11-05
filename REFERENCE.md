@@ -268,9 +268,9 @@ t:onResponse(function(res)
   print(res.remotePort) -- The server's network port.
   print(res.length)     -- The received body's length transported over network. This is not actual size of the body if the response compressed or encoded.
 
-  -- Read the body of the respnse using body function.
-  -- This method returns a string if succeeded to get body. Otherwise, for instance if body is too large, it returns nil.
-  print(res:body())
+  -- The response table have `read` and `lines` to read response body. The usage of these functions are the same as Lua's file object.
+  -- If body is too large, these methods raise error.
+  print(res:read("all"))
 
   return -- Return nothing.
 end)

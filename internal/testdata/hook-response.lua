@@ -19,10 +19,9 @@ t:onResponse(function(resp)
         remoteIP   = resp.remoteIP,
         remotePort = resp.remotePort,
         length     = 116,
-        body       = resp.body,
     })
 
-    assert.eq(resp:body(), '<title>world - test</title><div id="greeting">hello <b class="target">world</b>!</div>')
+    assert.eq(resp:read("all"), '<title>world - test</title><div id="greeting">hello <b class="target">world</b>!</div>')
 end)
 t:go(TEST.url("/"))
 assert.eq(called, true)
@@ -38,7 +37,6 @@ assert.eq(t.responses, {
         remoteIP   = "127.0.0.1",
         remotePort = t.responses[1].remotePort,
         length     = 116,
-        body       = t.responses[1].body,
     },
     _waited=0,
 })
