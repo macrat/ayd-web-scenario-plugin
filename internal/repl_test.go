@@ -1,21 +1,21 @@
 package webscenario
 
 import (
-	"time"
 	"context"
 	"strings"
 	"testing"
+	"time"
 
-	"github.com/yuin/gopher-lua"
-	"github.com/macrat/ayd/lib-ayd"
 	"github.com/google/go-cmp/cmp"
+	"github.com/macrat/ayd/lib-ayd"
+	"github.com/yuin/gopher-lua"
 )
 
 func Test_isIncomplete(t *testing.T) {
-	tests := []struct{
+	tests := []struct {
 		Script string
 		Want   bool
-	} {
+	}{
 		{"print('hello'", true},
 		{"print'hello')", false},
 	}
@@ -36,7 +36,7 @@ func TestEnvironment_DoStream(t *testing.T) {
 	server := StartTestServer()
 	t.Cleanup(server.Close)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 1 * time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
 	defer cancel()
 
 	storage, err := NewStorage(t.TempDir(), time.Now())
@@ -45,24 +45,60 @@ func TestEnvironment_DoStream(t *testing.T) {
 	}
 
 	var log strings.Builder
-
 	env := NewEnvironment(ctx, &Logger{Stream: &log}, storage, Arg{Mode: "stdin", Target: &ayd.URL{Scheme: "web-scenario", Opaque: "<stdin>"}, Timeout: 5 * time.Minute})
 	defer env.Close()
 
-	sourceImager.sources = make(map[string][]string)
-
-	err = env.DoStream(strings.NewReader("print('hello')\nprint('world')"), "stdin")
-	if err != nil {
-		t.Fatalf("unexpected error: %s", err)
+	tests := []struct {
+		Input  string
+		Log    string
+		Source []string
+	}{
+		{
+			"print('hello')\nprint('world')\n",
+			"hello\nworld\n",
+			[]string{"print('hello')", "print('world')", ""},
+		},
+		{
+			"print('hello')\nprint('world')",
+			"hello\nworld\n",
+			[]string{"print('hello')", "print('world')", ""},
+		},
+		{
+			"print('yo')\n",
+			"yo\n",
+			[]string{"print('yo')", ""},
+		},
+		{
+			"print('yo')",
+			"yo\n",
+			[]string{"print('yo')", ""},
+		},
+		{
+			"",
+			"",
+			[]string{},
+		},
 	}
 
-	if log.String() != "hello\nworld\n" {
-		t.Errorf("unexpected stdout: %q", log.String())
-	}
+	for i, tt := range tests {
+		var log strings.Builder
+		env.logger.Stream = &log
 
-	if s, ok := sourceImager.sources["<stdin>"]; !ok {
-		t.Errorf("source not found in the source imager")
-	} else if diff := cmp.Diff([]string{"print('hello')", "print('world')"}, s); diff != "" {
-		t.Errorf("unexpected source recorded:\n%s", diff)
+		sourceImager.sources = make(map[string][]string)
+
+		err = env.DoStream(strings.NewReader(tt.Input), "stdin")
+		if err != nil {
+			t.Fatalf("%d: unexpected error: %s", i, err)
+		}
+
+		if log.String() != tt.Log {
+			t.Errorf("%d: unexpected stdout: %q", i, log.String())
+		}
+
+		if s, ok := sourceImager.sources["<stdin>"]; !ok {
+			t.Errorf("%d: source not found in the source imager", i)
+		} else if diff := cmp.Diff(tt.Source, s); diff != "" {
+			t.Errorf("%d: unexpected source recorded:\n%s", i, diff)
+		}
 	}
 }

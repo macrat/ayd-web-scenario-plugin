@@ -227,7 +227,7 @@ func (s *SourceImager) RecordStdin(lines []string) {
 	if xs, ok := s.sources["<stdin>"]; ok {
 		s.sources["<stdin>"] = append(append(xs, lines...), "")
 	} else {
-		s.sources["<stdin>"] = append(lines, "")
+		s.sources["<stdin>"] = lines
 	}
 }
 

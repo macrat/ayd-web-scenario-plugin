@@ -99,17 +99,22 @@ func (env *Environment) DoREPL(ctx context.Context) error {
 type SourceRecordReader struct {
 	Upstream io.Reader
 	buf      string
+	finished bool
 }
 
 func (r *SourceRecordReader) Read(b []byte) (int, error) {
 	n, err := r.Upstream.Read(b)
 	if err == nil {
-		xs := strings.Split(r.buf+string(b), "\n")
+		xs := strings.Split(r.buf+string(b[:n]), "\n")
 		xs, r.buf = xs[:len(xs)-1], xs[len(xs)-1]
 		sourceImager.RecordStdin(xs)
-	}
-	if err == io.EOF {
-		sourceImager.RecordStdin([]string{r.buf})
+	} else if err == io.EOF && !r.finished {
+		if len(r.buf) == 0 {
+			sourceImager.RecordStdin([]string{})
+		} else {
+			sourceImager.RecordStdin([]string{r.buf})
+		}
+		r.finished = true
 	}
 	return n, err
 }
