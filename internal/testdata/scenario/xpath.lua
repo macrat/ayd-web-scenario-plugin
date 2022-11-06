@@ -18,4 +18,4 @@ assert(ok, err)
 
 ok, err = pcall(t.waitXPath, t, "//div/div/div", 100*time.millisecond)
 assert.eq(ok, false)
-assert.eq(err, "testdata/xpath.lua:19: timeout")
+assert.eq(err, "testdata/scenario/xpath.lua:19: timeout")

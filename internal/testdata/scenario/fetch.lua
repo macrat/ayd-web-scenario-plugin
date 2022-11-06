@@ -78,7 +78,7 @@ assert.eq(
 
 ok, err = pcall(fetch, TEST.url("/slow"), {timeout=10*time.millisecond})
 assert.eq(ok, false)
-assert.eq(err, "testdata/fetch.lua:79: timeout")
+assert.eq(err, "testdata/scenario/fetch.lua:79: timeout")
 
 ok = pcall(fetch, TEST.url("/slow"), {timeout=500*time.millisecond})
 assert.eq(ok, true)

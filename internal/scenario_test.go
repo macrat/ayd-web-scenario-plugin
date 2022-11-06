@@ -190,7 +190,7 @@ func (w *DebugWriter) Write(b []byte) (int, error) {
 func Test_testSenarios(t *testing.T) {
 	t.Parallel()
 
-	files, err := filepath.Glob("testdata/*.lua")
+	files, err := filepath.Glob("testdata/scenario/*.lua")
 	if err != nil {
 		t.Fatalf("failed to get tests: %s", err)
 	}

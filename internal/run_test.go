@@ -56,8 +56,8 @@ func TestRun(t *testing.T) {
 				Status:  ayd.StatusFailure,
 				Message: "It's working!",
 				Extra: map[string]any{
-					"error": `./testdata/_main-test.lua:13: assertion failed: "world" == "incorrect"`,
-					"trace": "stack traceback:\n\t[G]: in function 'eq'\n\t./testdata/_main-test.lua:13: in main chunk\n\t[G]: ?",
+					"error": `./testdata/run-test.lua:13: assertion failed: "world" == "incorrect"`,
+					"trace": "stack traceback:\n\t[G]: in function 'eq'\n\t./testdata/run-test.lua:13: in main chunk\n\t[G]: ?",
 				},
 			},
 		},
@@ -70,8 +70,8 @@ func TestRun(t *testing.T) {
 				Message: "It's working!",
 				Extra: map[string]any{
 					"msg":   "hello",
-					"error": `./testdata/_main-test.lua:13: assertion failed: "world" == "incorrect"`,
-					"trace": "stack traceback:\n\t[G]: in function 'eq'\n\t./testdata/_main-test.lua:13: in main chunk\n\t[G]: ?",
+					"error": `./testdata/run-test.lua:13: assertion failed: "world" == "incorrect"`,
+					"trace": "stack traceback:\n\t[G]: in function 'eq'\n\t./testdata/run-test.lua:13: in main chunk\n\t[G]: ?",
 				},
 			},
 		},
@@ -93,8 +93,8 @@ func TestRun(t *testing.T) {
 				Status:  ayd.StatusFailure,
 				Message: "It's working!",
 				Extra: map[string]any{
-					"error": "./testdata/_main-test.lua:16: something",
-					"trace": "stack traceback:\n\t[G]: in function 'error'\n\t./testdata/_main-test.lua:16: in main chunk\n\t[G]: ?",
+					"error": "./testdata/run-test.lua:16: something",
+					"trace": "stack traceback:\n\t[G]: in function 'error'\n\t./testdata/run-test.lua:16: in main chunk\n\t[G]: ?",
 				},
 			},
 		},
@@ -109,7 +109,7 @@ func TestRun(t *testing.T) {
 
 			r := Run(Arg{
 				Mode:    "ayd",
-				Target:  &ayd.URL{Scheme: "web-scenario", Opaque: "./testdata/_main-test.lua"},
+				Target:  &ayd.URL{Scheme: "web-scenario", Opaque: "./testdata/run-test.lua"},
 				Timeout: 5 * time.Minute,
 			})
 
@@ -134,7 +134,7 @@ func TestRun(t *testing.T) {
 	t.Run("timeout", func(t *testing.T) {
 		r := Run(Arg{
 			Mode:    "ayd",
-			Target:  &ayd.URL{Scheme: "web-scenario", Opaque: "./testdata/_timeout-test.lua"},
+			Target:  &ayd.URL{Scheme: "web-scenario", Opaque: "./testdata/timeout.lua"},
 			Timeout: 500 * time.Millisecond,
 		})
 

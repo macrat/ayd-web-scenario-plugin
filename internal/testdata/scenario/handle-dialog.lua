@@ -78,7 +78,7 @@ before = time.now()
 ok, msg = pcall(t.waitDialog, t, 100*time.millisecond)
 after = time.now()
 assert.eq(ok, false)
-assert.eq(msg, "testdata/handle-dialog.lua:78: timeout")
+assert.eq(msg, "testdata/scenario/handle-dialog.lua:78: timeout")
 assert.ge(after - before, 100*time.millisecond)
 assert.lt(after - before, 200*time.millisecond)
 

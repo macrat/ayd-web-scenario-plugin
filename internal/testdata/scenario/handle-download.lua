@@ -25,7 +25,7 @@ t1:waitDownload()
 
 ok, err = pcall(t1.waitDownload, t1, 0)
 assert.eq(ok, false)
-assert.eq(err, "testdata/handle-download.lua:26: timeout")
+assert.eq(err, "testdata/scenario/handle-download.lua:26: timeout")
 
 assert.eq(t1.downloads, {
     {path=TEST.storage("data.txt"), bytes=14},
