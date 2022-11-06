@@ -32,6 +32,20 @@ assert.eq(collect(csv), {
     {hello="csv", foo=""},
 })
 
+csv, header = fromcsv({
+    "hello,foo",
+    "world,bar",
+    ",baz",
+    "csv,"
+}, false)
+assert.eq(header, nil)
+assert.eq(collect(csv), {
+    {"hello", "foo"},
+    {"world", "bar"},
+    {"", "baz"},
+    {"csv", ""},
+})
+
 i = 0
 function f()
     i = i + 1

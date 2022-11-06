@@ -444,11 +444,6 @@ func decodeXML(dec *xml.Decoder, start xml.StartElement, L *lua.LState) *lua.LTa
 			if s != "" {
 				tbl.Append(lua.LString(s))
 			}
-		case xml.Directive:
-			if strings.HasPrefix(string(t), "[CDATA[") && strings.HasSuffix(string(t), "]]") {
-				s := string(t[len("[CDATA["):])
-				tbl.Append(lua.LString(s[:len(s)-1]))
-			}
 		}
 	}
 }
