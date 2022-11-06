@@ -114,6 +114,14 @@ func (env *Environment) StartTask(where, taskName string) {
 	env.logger.StartTask(where, taskName)
 }
 
+func (env *Environment) BuildTable(build func(L *lua.LState, tbl *lua.LTable)) *lua.LTable {
+	env.Lock()
+	defer env.Unlock()
+	tbl := env.lua.NewTable()
+	build(env.lua, tbl)
+	return tbl
+}
+
 func (env *Environment) NewFunction(f lua.LGFunction) *lua.LFunction {
 	return env.lua.NewFunction(f)
 }

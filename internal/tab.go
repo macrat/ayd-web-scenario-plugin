@@ -142,64 +142,68 @@ func (t *Tab) ToLua(L *lua.LState) *lua.LUserData {
 	chromedp.ListenTarget(t.ctx, func(ev any) {
 		switch e := ev.(type) {
 		case *page.EventJavascriptDialogOpening:
-			ev := L.NewTable()
-			L.SetField(ev, "type", lua.LString(e.Type.String()))
-			L.SetField(ev, "message", lua.LString(e.Message))
-			L.SetField(ev, "url", lua.LString(e.URL))
+			ev := t.env.BuildTable(func(L *lua.LState, ev *lua.LTable) {
+				L.SetField(ev, "type", lua.LString(e.Type.String()))
+				L.SetField(ev, "message", lua.LString(e.Message))
+				L.SetField(ev, "url", lua.LString(e.URL))
+			})
 			t.dialogEvent.Invoke(t, ev)
 		case *browser.EventDownloadWillBegin:
 			t.env.storage.StartDownload(e.GUID, e.SuggestedFilename)
 		case *browser.EventDownloadProgress:
 			switch e.State {
 			case browser.DownloadProgressStateCompleted:
-				ev := L.NewTable()
-				L.SetField(ev, "path", lua.LString(t.env.storage.CompleteDownload(e.GUID)))
-				L.SetField(ev, "bytes", lua.LNumber(e.TotalBytes))
+				ev := t.env.BuildTable(func(L *lua.LState, ev *lua.LTable) {
+					L.SetField(ev, "path", lua.LString(t.env.storage.CompleteDownload(e.GUID)))
+					L.SetField(ev, "bytes", lua.LNumber(e.TotalBytes))
+				})
 				t.downloadEvent.Invoke(t, ev)
 			case browser.DownloadProgressStateCanceled:
 				t.env.storage.CancelDownload(e.GUID)
 			}
 		case *network.EventRequestWillBeSent:
-			ev := L.NewTable()
-			L.SetField(ev, "id", lua.LString(e.RequestID.String()))
-			L.SetField(ev, "type", lua.LString(e.Type.String()))
-			L.SetField(ev, "url", lua.LString(e.DocumentURL))
-			L.SetField(ev, "method", lua.LString(e.Request.Method))
-			if e.Request.HasPostData {
-				L.SetField(ev, "body", lua.LString(e.Request.PostData))
-			}
+			ev := t.env.BuildTable(func(L *lua.LState, ev *lua.LTable) {
+				L.SetField(ev, "id", lua.LString(e.RequestID.String()))
+				L.SetField(ev, "type", lua.LString(e.Type.String()))
+				L.SetField(ev, "url", lua.LString(e.DocumentURL))
+				L.SetField(ev, "method", lua.LString(e.Request.Method))
+				if e.Request.HasPostData {
+					L.SetField(ev, "body", lua.LString(e.Request.PostData))
+				}
+			})
 			t.requestEvent.Invoke(t, ev)
 		case *network.EventLoadingFinished:
 			t.loading.Complete(e.RequestID)
 		case *network.EventResponseReceived:
-			ev := L.NewTable()
-			L.SetField(ev, "id", lua.LString(e.RequestID.String()))
-			L.SetField(ev, "type", lua.LString(e.Type.String()))
-			L.SetField(ev, "url", lua.LString(e.Response.URL))
-			L.SetField(ev, "status", lua.LNumber(e.Response.Status))
-			L.SetField(ev, "mimetype", lua.LString(e.Response.MimeType))
-			L.SetField(ev, "remoteIP", lua.LString(e.Response.RemoteIPAddress))
-			L.SetField(ev, "remotePort", lua.LNumber(e.Response.RemotePort))
-			L.SetField(ev, "length", lua.LNumber(e.Response.EncodedDataLength))
+			ev := t.env.BuildTable(func(L *lua.LState, ev *lua.LTable) {
+				L.SetField(ev, "id", lua.LString(e.RequestID.String()))
+				L.SetField(ev, "type", lua.LString(e.Type.String()))
+				L.SetField(ev, "url", lua.LString(e.Response.URL))
+				L.SetField(ev, "status", lua.LNumber(e.Response.Status))
+				L.SetField(ev, "mimetype", lua.LString(e.Response.MimeType))
+				L.SetField(ev, "remoteIP", lua.LString(e.Response.RemoteIPAddress))
+				L.SetField(ev, "remotePort", lua.LNumber(e.Response.RemotePort))
+				L.SetField(ev, "length", lua.LNumber(e.Response.EncodedDataLength))
 
-			L.SetMetatable(ev, AsFileLikeMeta(L, NewDelayedReader(func() io.Reader {
-				var body []byte
-				t.Run(L, "$response:read()", false, 0, chromedp.ActionFunc(func(ctx context.Context) (err error) {
-					ctx, cancel := context.WithTimeout(ctx, 1*time.Minute)
-					defer cancel()
+				L.SetMetatable(ev, AsFileLikeMeta(L, NewDelayedReader(func() io.Reader {
+					var body []byte
+					t.Run(L, "$response:read()", false, 0, chromedp.ActionFunc(func(ctx context.Context) (err error) {
+						ctx, cancel := context.WithTimeout(ctx, 1*time.Minute)
+						defer cancel()
 
-					t.loading.Wait(e.RequestID)
-					body, err = network.GetResponseBody(e.RequestID).Do(ctx)
-					var cdperr *cdproto.Error
-					if errors.As(err, &cdperr) && cdperr.Code == -32000 {
-						// -32000 means "no data found"
-						body = nil
-						err = nil
-					}
-					return err
-				}))
-				return bytes.NewReader(body)
-			})))
+						t.loading.Wait(e.RequestID)
+						body, err = network.GetResponseBody(e.RequestID).Do(ctx)
+						var cdperr *cdproto.Error
+						if errors.As(err, &cdperr) && cdperr.Code == -32000 {
+							// -32000 means "no data found"
+							body = nil
+							err = nil
+						}
+						return err
+					}))
+					return bytes.NewReader(body)
+				})))
+			})
 
 			t.responseEvent.Invoke(t, ev)
 		}
