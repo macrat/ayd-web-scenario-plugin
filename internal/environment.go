@@ -46,6 +46,7 @@ func NewEnvironment(ctx context.Context, logger *Logger, s *Storage, arg Arg) *E
 	RegisterFileLike(L)
 	RegisterEncodings(env)
 	RegisterFetch(ctx, env)
+	s.Register(env)
 	arg.Register(L)
 
 	return env
@@ -75,10 +76,6 @@ func (env *Environment) HandleError(err error) {
 
 func (env *Environment) DoFile(path string) error {
 	return env.lua.DoFile(path)
-}
-
-func (env *Environment) NewFunction(f lua.LGFunction) *lua.LFunction {
-	return env.lua.NewFunction(f)
 }
 
 // Yield makes a chance to execute callback function.
@@ -117,8 +114,27 @@ func (env *Environment) StartTask(where, taskName string) {
 	env.logger.StartTask(where, taskName)
 }
 
+func (env *Environment) NewFunction(f lua.LGFunction) *lua.LFunction {
+	return env.lua.NewFunction(f)
+}
+
 func (env *Environment) RegisterFunction(name string, f lua.LGFunction) {
-	env.lua.SetGlobal(name, env.lua.NewFunction(f))
+	env.lua.SetGlobal(name, env.NewFunction(f))
+}
+
+func (env *Environment) RegisterTable(name string, fields, meta map[string]lua.LValue) {
+	tbl := env.lua.NewTable()
+	for k, v := range fields {
+		env.lua.SetField(tbl, k, v)
+	}
+	if meta != nil {
+		m := env.lua.NewTable()
+		for k, v := range meta {
+			env.lua.SetField(m, k, v)
+		}
+		env.lua.SetMetatable(tbl, m)
+	}
+	env.lua.SetGlobal(name, tbl)
 }
 
 func (env *Environment) RegisterNewType(name string, methods map[string]lua.LGFunction, fields map[string]lua.LValue) {

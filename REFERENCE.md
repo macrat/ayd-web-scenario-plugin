@@ -3,14 +3,24 @@ Reference of Web-Scenario
 
 The Web-Scenario's script is based on the Lua 5.1 ([GopherLua](https://github.com/yuin/gopher-lua)), and some extra functions.
 
-- [arg](#arg): Read argument and options to this execution.
-- [tab](#tab): Open, handle, and close browser tab.
-- [element](#element): Read and control HTML element.
-- [fetch](#fetch): Communicate via HTTP, without browser.
-- [print](#print): Report and store information.
-- [assert](#assert): Assertion test values.
-- [time](#time): Get or wait time.
-- [encoding](#encoding): Serialize or deserialize values.
+- __Browser Control__
+  - [arg](#arg): Read argument and options to this execution.
+  - [tab](#tab): Open, handle, and close browser tab.
+  - [element](#element): Read and control HTML element.
+
+- __HTTP Communication__
+  - [fetch](#fetch): Communicate via HTTP, without browser.
+
+- __Test and Report__
+  - [print](#print): Report and store information.
+  - [assert](#assert): Assertion test values.
+  - [artifact](#artifact): Save and load artifacts.
+
+- __Flow Control__
+  - [time](#time): Get or wait time.
+
+- __Data Serialization__
+  - [encoding](#encoding): Serialize or deserialize values.
 
 
 Arg
@@ -466,6 +476,27 @@ This is similar to [`assert(x > y)`](#asserttestmessage), but it provides more c
 
 Raises error if `x` is not greater or equals to `y`.
 This is similar to [`assert(x >= y)`](#asserttestmessage), but it provides more convinient error message.
+
+
+Artifact
+--------
+
+#### `artifact.list`
+
+The list of artifact names that downloaded via browser, or created via [`artifact.open`](#artifactopennamemode).
+
+#### `artifact.path`
+
+The path to artifact directory.
+
+#### `artifact.open(name, [mode])`
+
+Open an artifact file as [`file` object](https://www.lua.org/manual/5.1/manual.html#5.7).
+The parameter `mode` is the same as [`io.open()`](https://www.lua.org/manual/5.1/manual.html#pdf-io.open).
+
+#### `artifact.remove(name)`
+
+Remove an artifct file.
 
 
 Time
