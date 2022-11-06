@@ -142,14 +142,6 @@ func compressGif(images []*image.Paletted) {
 	}
 }
 
-func copyImage(dst, src *image.Paletted, rect image.Rectangle, offset image.Point) {
-	for y := rect.Min.Y; y < rect.Max.Y; y++ {
-		for x := rect.Min.X; x < rect.Max.X; x++ {
-			dst.SetColorIndex(x+offset.X, y+offset.Y, src.ColorIndexAt(x, y))
-		}
-	}
-}
-
 func (r *Recorder) SaveTo(f io.Writer) error {
 	if len(r.images) == 0 {
 		return NoRecord
