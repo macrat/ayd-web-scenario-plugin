@@ -147,7 +147,14 @@ func RegisterLogger(L *lua.LState, logger *Logger) {
 			return 0
 		},
 		"extra": func(L *lua.LState) int {
-			logger.SetExtra(L.CheckString(1), UnpackLValue(L.CheckAny(2)))
+			key := L.CheckString(1)
+			switch strings.ToLower(key) {
+			case "time", "status", "latency", "target", "message":
+				L.RaiseError("print.extra can not set %q", key)
+			default:
+				value := UnpackLValue(L.CheckAny(2))
+				logger.SetExtra(key, value)
+			}
 			return 0
 		},
 	})
