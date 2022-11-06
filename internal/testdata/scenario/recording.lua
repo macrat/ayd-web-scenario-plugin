@@ -18,12 +18,14 @@ while #artifact.list < 1 do
 end
 assert.eq(artifact.list, {"record1.gif"})
 
-time.sleep(100*time.millisecond) -- wait for writing GIF.
+-- loop to wait for writing GIF.
+while #artifact.open("record1.gif", "rb"):read("*a") == 0 do
+    time.sleep(100*time.millisecond)
+end
+time.sleep(100*time.millisecond)
 
 -- generate test data
---print(io.popen("cp " .. artifact.path .. "/record1.gif testdata/gif/record.gif"):read("*a"))
+--print(io.popen("cp " .. artifact.path .. "/record1.gif testdata/gif/record-actual.gif"):read("*a"))
 
-assert(
-    artifact.open("record1.gif", "rb"):read("*a") == io.open("testdata/gif/record.gif", "rb"):read("*a"),
-    "recorded gif is different"
-)
+want = io.open("testdata/gif/record.gif", "rb"):read("*a")
+assert(artifact.open("record1.gif", "rb"):read("*a") == want, "recorded gif is different")
