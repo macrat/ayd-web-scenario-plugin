@@ -15,10 +15,14 @@ t:onResponse(function(resp)
         type       = "Document",
         url        = TEST.url("/"),
         status     = 200,
-        mimetype   = "text/html",
+        length     = 116,
         remoteIP   = resp.remoteIP,
         remotePort = resp.remotePort,
-        length     = 116,
+        headers    = {
+            Date               = resp.headers.Date,
+            ["Content-Type"]   = "text/html; charset=utf-8",
+            ["Content-Length"] = "86",
+        },
     })
 
     assert.eq(resp:read("all"), '<title>world - test</title><div id="greeting">hello <b class="target">world</b>!</div>')
@@ -33,10 +37,14 @@ assert.eq(t.responses, {
         type       = "Document",
         url        = TEST.url("/"),
         status     = 200,
-        mimetype   = "text/html",
+        length     = 116,
         remoteIP   = "127.0.0.1",
         remotePort = t.responses[1].remotePort,
-        length     = 116,
+        headers    = {
+            Date               = t.responses[1].headers.Date,
+            ["Content-Type"]   = "text/html; charset=utf-8",
+            ["Content-Length"] = "86",
+        },
     },
     _waited=0,
 })

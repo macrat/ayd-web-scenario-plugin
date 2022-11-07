@@ -1,4 +1,4 @@
-t = tab.new()
+t = tab.new({useragent="TestUserAgent/1.2.3"})
 
 
 called = false
@@ -7,11 +7,15 @@ t:onRequest(function(req)
     assert.ne(req.id, "")
 
     assert.eq(req, {
-        id     = req.id,
-        type   = "Document",
-        url    = TEST.url("/"),
-        method = "GET",
-        body   = nil,
+        id      = req.id,
+        type    = "Document",
+        url     = TEST.url("/"),
+        method  = "GET",
+        body    = nil,
+        headers = {
+            ["Upgrade-Insecure-Requests"] = "1",
+            ["User-Agent"]                = "TestUserAgent/1.2.3",
+        },
     })
 end)
 t:go(TEST.url("/"))
@@ -29,11 +33,18 @@ t:onRequest(function(req)
     assert.ne(req.id, "")
 
     assert.eq(req, {
-        id     = req.id,
-        type   = "Document",
-        url    = TEST.url("/post"),
-        method = "POST",
-        body   = "value=hello+POST+form",
+        id      = req.id,
+        type    = "Document",
+        url     = TEST.url("/post"),
+        method  = "POST",
+        body    = "value=hello+POST+form",
+        headers = {
+            Origin                        = TEST.url(),
+            Referer                       = TEST.url("/post"),
+            ["Content-Type"]              = "application/x-www-form-urlencoded",
+            ["Upgrade-Insecure-Requests"] = "1",
+            ["User-Agent"]                = "TestUserAgent/1.2.3",
+        },
     })
 end)
 t("input[type=submit]"):click()
@@ -42,8 +53,8 @@ assert.eq(called, true)
 
 
 assert.eq(t.requests, {
-    {id=t.requests[1].id, method="GET",  type="Document", url=TEST.url("/"),   },
-    {id=t.requests[2].id, method="POST", type="Document", url=TEST.url("/post"), body="value=hello+POST+form"},
+    {id=t.requests[1].id, method="GET",  type="Document", url=TEST.url("/"),     headers=t.requests[1].headers},
+    {id=t.requests[2].id, method="POST", type="Document", url=TEST.url("/post"), headers=t.requests[2].headers, body="value=hello+POST+form"},
     _waited=0,
 })
 

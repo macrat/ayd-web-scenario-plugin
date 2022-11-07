@@ -177,6 +177,7 @@ func (t *Tab) ToLua(L *lua.LState) *lua.LUserData {
 				L.SetField(ev, "type", lua.LString(e.Type.String()))
 				L.SetField(ev, "url", lua.LString(e.DocumentURL))
 				L.SetField(ev, "method", lua.LString(e.Request.Method))
+				L.SetField(ev, "headers", PackLValue(L, e.Request.Headers))
 				if e.Request.HasPostData {
 					L.SetField(ev, "body", lua.LString(e.Request.PostData))
 				}
@@ -190,10 +191,10 @@ func (t *Tab) ToLua(L *lua.LState) *lua.LUserData {
 				L.SetField(ev, "type", lua.LString(e.Type.String()))
 				L.SetField(ev, "url", lua.LString(e.Response.URL))
 				L.SetField(ev, "status", lua.LNumber(e.Response.Status))
-				L.SetField(ev, "mimetype", lua.LString(e.Response.MimeType))
+				L.SetField(ev, "headers", PackLValue(L, e.Response.Headers))
+				L.SetField(ev, "length", lua.LNumber(e.Response.EncodedDataLength))
 				L.SetField(ev, "remoteIP", lua.LString(e.Response.RemoteIPAddress))
 				L.SetField(ev, "remotePort", lua.LNumber(e.Response.RemotePort))
-				L.SetField(ev, "length", lua.LNumber(e.Response.EncodedDataLength))
 
 				L.SetMetatable(ev, AsFileLikeMeta(L, NewDelayedReader(func() io.Reader {
 					var body []byte

@@ -240,11 +240,12 @@ Set a callback function that will called when sending network request.
 
 ``` lua
 t:onRequest(function(req)
-  print(req.id)     -- String ID for the request/response.
-  print(req.type)   -- The type of the resource. seealso: https://chromedevtools.github.io/devtools-protocol/tot/Network/#type-ResourceType
-  print(req.url)    -- The requested URL.
-  print(req.method) -- The request method like "GET" or "POST".
-  print(req.body)   -- The request body in string. If the request doesn't have post data, it will be a nil value.
+  print(req.id)      -- String ID for the request/response.
+  print(req.type)    -- The type of the resource. seealso: https://chromedevtools.github.io/devtools-protocol/tot/Network/#type-ResourceType
+  print(req.url)     -- The requested URL.
+  print(req.method)  -- The request method like "GET" or "POST".
+  print(req.headers) -- The headers to send.
+  print(req.body)    -- The request body in string. If the request doesn't have post data, it will be a nil value.
 
   return -- Return nothing.
 end)
@@ -274,10 +275,10 @@ t:onResponse(function(res)
   print(res.type)       -- The type of the resource. seealso: https://chromedevtools.github.io/devtools-protocol/tot/Network/#type-ResourceType
   print(res.url)        -- The requested URL.
   print(res.status)     -- The status code of the response like 200 or 404.
-  print(res.mimetype)   -- The MIME-Type of the response body.
+  print(res.headers)    -- The headers received from the server.
+  print(res.length)     -- The received body's length transported over network. This is not actual size of the body if the response compressed or encoded.
   print(res.remoteIP)   -- The server's IP address.
   print(res.remotePort) -- The server's network port.
-  print(res.length)     -- The received body's length transported over network. This is not actual size of the body if the response compressed or encoded.
 
   -- The response table have `read` and `lines` to read response body. The usage of these functions are the same as Lua's file object.
   -- If body is too large, these methods raise error.
