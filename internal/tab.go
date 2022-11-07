@@ -14,6 +14,7 @@ import (
 	"github.com/chromedp/cdproto/network"
 	"github.com/chromedp/cdproto/page"
 	"github.com/chromedp/chromedp"
+	"github.com/chromedp/chromedp/device"
 	"github.com/yuin/gopher-lua"
 )
 
@@ -67,6 +68,7 @@ type Tab struct {
 func NewTab(ctx context.Context, L *lua.LState, env *Environment, id int) *Tab {
 	url := ""
 	width, height := int64(800), int64(800)
+	userAgent := ""
 	recording := false
 
 	switch v := L.Get(1).(type) {
@@ -81,6 +83,9 @@ func NewTab(ctx context.Context, L *lua.LState, env *Environment, id int) *Tab {
 		}
 		if h, ok := L.GetField(v, "height").(lua.LNumber); ok {
 			height = int64(h)
+		}
+		if ua, ok := L.GetField(v, "useragent").(lua.LString); ok {
+			userAgent = string(ua)
 		}
 		recording = lua.LVAsBool(L.GetField(v, "recording"))
 	case *lua.LNilType:
@@ -107,7 +112,12 @@ func NewTab(ctx context.Context, L *lua.LState, env *Environment, id int) *Tab {
 		}
 		t.RunInCallback(
 			browser.SetDownloadBehavior(browser.SetDownloadBehaviorBehaviorAllow).WithDownloadPath(env.storage.Dir).WithEventsEnabled(true),
-			chromedp.EmulateViewport(t.width, t.height),
+			chromedp.Emulate(device.Info{
+				UserAgent: userAgent,
+				Width:     t.width,
+				Height:    t.height,
+				Scale:     1,
+			}),
 		)
 		return t
 	})

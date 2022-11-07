@@ -70,6 +70,7 @@ If `option` is a table, this function uses below properties.
 - `url`: The URL string for the new tab. Default is `about:blank`.
 - `width`: The width number of the tab's viewport. Default is 800.
 - `height`: The height number of the tab's viewport. Default is 800.
+- `useragent`: The User-Agent of the tab. Blank string means use browser's default value.
 - `recording`: Boolean to enable animated GIF record for the tab. Default is false.
 
 #### `tab:close()`
