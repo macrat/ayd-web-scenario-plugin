@@ -7,7 +7,7 @@ import (
 )
 
 func RegisterAssert(L *lua.LState) {
-	failed := func(operator string, a, b string) {
+	failed := func(L *lua.LState, operator string, a, b string) {
 		L.RaiseError("assertion failed: %s %s %s", a, operator, b)
 	}
 
@@ -15,19 +15,19 @@ func RegisterAssert(L *lua.LState) {
 		return func(L *lua.LState) int {
 			a, b := L.Get(1), L.Get(2)
 			if a.Type() != b.Type() {
-				failed(operator, LValueToString(a), LValueToString(b))
+				failed(L, operator, LValueToString(a), LValueToString(b))
 			}
 			switch a.Type() {
 			case lua.LTString:
 				if !s(string(a.(lua.LString)), string(b.(lua.LString))) {
-					failed(operator, LValueToString(a), LValueToString(b))
+					failed(L, operator, LValueToString(a), LValueToString(b))
 				}
 			case lua.LTNumber:
 				if !n(float64(a.(lua.LNumber)), float64(b.(lua.LNumber))) {
-					failed(operator, LValueToString(a), LValueToString(b))
+					failed(L, operator, LValueToString(a), LValueToString(b))
 				}
 			default:
-				failed(operator, LValueToString(a), LValueToString(b))
+				failed(L, operator, LValueToString(a), LValueToString(b))
 			}
 			return 2
 		}
@@ -38,7 +38,7 @@ func RegisterAssert(L *lua.LState) {
 			a := UnpackLValue(L.Get(1))
 			b := UnpackLValue(L.Get(2))
 			if !reflect.DeepEqual(a, b) {
-				failed("==", LValueToString(L.Get(1)), LValueToString(L.Get(2)))
+				failed(L, "==", LValueToString(L.Get(1)), LValueToString(L.Get(2)))
 			}
 			return 2
 		},
@@ -46,7 +46,7 @@ func RegisterAssert(L *lua.LState) {
 			a := UnpackLValue(L.Get(1))
 			b := UnpackLValue(L.Get(2))
 			if reflect.DeepEqual(a, b) {
-				failed("~=", LValueToString(L.Get(1)), LValueToString(L.Get(2)))
+				failed(L, "~=", LValueToString(L.Get(1)), LValueToString(L.Get(2)))
 			}
 			return 2
 		},
