@@ -367,14 +367,28 @@ func (t *Tab) Wait(L *lua.LState) {
 	query := L.CheckString(2)
 	timeout := time.Duration(float64(L.OptNumber(3, 0)) * float64(time.Millisecond))
 
-	t.Run(L, fmt.Sprintf("$:wait(%q)", query), true, timeout, chromedp.WaitVisible(query, chromedp.ByQuery))
+	t.Run(L, fmt.Sprintf("$:wait(%q)", query), true, timeout, chromedp.WaitReady(query, chromedp.ByQuery))
+}
+
+func (t *Tab) WaitVisible(L *lua.LState) {
+	query := L.CheckString(2)
+	timeout := time.Duration(float64(L.OptNumber(3, 0)) * float64(time.Millisecond))
+
+	t.Run(L, fmt.Sprintf("$:waitVisible(%q)", query), true, timeout, chromedp.WaitVisible(query, chromedp.ByQuery))
 }
 
 func (t *Tab) WaitXPath(L *lua.LState) {
 	query := L.CheckString(2)
 	timeout := time.Duration(float64(L.OptNumber(3, 0)) * float64(time.Millisecond))
 
-	t.Run(L, fmt.Sprintf("$:waitXPath(%q)", query), true, timeout, chromedp.WaitVisible(query, chromedp.BySearch))
+	t.Run(L, fmt.Sprintf("$:waitXPath(%q)", query), true, timeout, chromedp.WaitReady(query, chromedp.BySearch))
+}
+
+func (t *Tab) WaitXPathVisible(L *lua.LState) {
+	query := L.CheckString(2)
+	timeout := time.Duration(float64(L.OptNumber(3, 0)) * float64(time.Millisecond))
+
+	t.Run(L, fmt.Sprintf("$:waitXPathVisible(%q)", query), true, timeout, chromedp.WaitVisible(query, chromedp.BySearch))
 }
 
 func (t *Tab) WaitEvent(L *lua.LState, taskName string, h *EventHandler) int {
@@ -543,22 +557,24 @@ func RegisterTabType(ctx context.Context, env *Environment) {
 	}
 
 	methods := map[string]*lua.LFunction{
-		"go":           fn((*Tab).Go),
-		"forward":      fn((*Tab).Forward),
-		"back":         fn((*Tab).Back),
-		"reload":       fn((*Tab).Reload),
-		"close":        fn((*Tab).LClose),
-		"screenshot":   fn((*Tab).Screenshot),
-		"wait":         fn((*Tab).Wait),
-		"waitXPath":    fn((*Tab).WaitXPath),
-		"waitDialog":   fret((*Tab).WaitDialog),
-		"waitDownload": fret((*Tab).WaitDownload),
-		"waitRequest":  fret((*Tab).WaitRequest),
-		"waitResponse": fret((*Tab).WaitResponse),
-		"onDialog":     fn((*Tab).OnDialog),
-		"onDownload":   fn((*Tab).OnDownload),
-		"onRequest":    fn((*Tab).OnRequest),
-		"onResponse":   fn((*Tab).OnResponse),
+		"go":               fn((*Tab).Go),
+		"forward":          fn((*Tab).Forward),
+		"back":             fn((*Tab).Back),
+		"reload":           fn((*Tab).Reload),
+		"close":            fn((*Tab).LClose),
+		"screenshot":       fn((*Tab).Screenshot),
+		"wait":             fn((*Tab).Wait),
+		"waitXPath":        fn((*Tab).WaitXPath),
+		"waitVisible":      fn((*Tab).WaitVisible),
+		"waitXPathVisible": fn((*Tab).WaitXPathVisible),
+		"waitDialog":       fret((*Tab).WaitDialog),
+		"waitDownload":     fret((*Tab).WaitDownload),
+		"waitRequest":      fret((*Tab).WaitRequest),
+		"waitResponse":     fret((*Tab).WaitResponse),
+		"onDialog":         fn((*Tab).OnDialog),
+		"onDownload":       fn((*Tab).OnDownload),
+		"onRequest":        fn((*Tab).OnRequest),
+		"onResponse":       fn((*Tab).OnResponse),
 		"all": env.NewFunction(func(L *lua.LState) int {
 			t := CheckTab(L)
 			query := L.CheckString(2)

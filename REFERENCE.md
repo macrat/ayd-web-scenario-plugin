@@ -129,15 +129,27 @@ The result of this method is a table of [element](#element)s with the same metat
 
 #### `tab:wait(query, [timeout])`
 
-Wait until an element specified in `query` to ready.
+Wait until an element specified in `query` to be ready.
+
+It raises an error if the `timeout` in millisecond exceeded.
+The default `timeout` is -1 means wait forever.
+
+#### `tab:waitVisible(query, [timeout])`
+
+Wait until an element specified in `query` to be visible.
 
 It raises an error if the `timeout` in millisecond exceeded.
 The default `timeout` is -1 means wait forever.
 
 #### `tab:waitXPath(xpath, [timeout])`
 
-Wait until an element specified in `xpath` to ready.
+Wait until an element specified in `xpath` to be ready.
 This function is very similar to [`tab:wait()`](#tabwaitquerytimeout) but it uses XPath instead of CSS selector.
+
+#### `tab:waitXPath(xpath, [timeout])`
+
+Wait until an element specified in `xpath` to be visible.
+This function is very similar to [`tab:waitVisible()`](#tabwaitvisiblequerytimeout) but it uses XPath instead of CSS selector.
 
 
 ### Retrieve tab information ###
