@@ -19,10 +19,9 @@ type Encodings struct {
 
 func (e Encodings) ToJSON(L *lua.LState) int {
 	v := L.Get(1)
-	s := AsyncRun(e.env, func() string {
+	s := AsyncRun(e.env, L, func() (string, error) {
 		bs, err := json.Marshal(UnpackLValue(v))
-		e.env.HandleError(err)
-		return string(bs)
+		return string(bs), err
 	})
 	L.Push(lua.LString(s))
 	return 1
@@ -31,9 +30,9 @@ func (e Encodings) ToJSON(L *lua.LState) int {
 func (e Encodings) FromJSON(L *lua.LState) int {
 	s := L.CheckString(1)
 	var v any
-	AsyncRun(e.env, func() struct{} {
-		json.Unmarshal([]byte(s), &v)
-		return struct{}{}
+	AsyncRun(e.env, L, func() (struct{}, error) {
+		err := json.Unmarshal([]byte(s), &v)
+		return struct{}{}, err
 	})
 	L.Push(PackLValue(L, v))
 	return 1
@@ -130,7 +129,7 @@ func (e Encodings) ToCSV(L *lua.LState) int {
 
 		if keep != nil {
 			s, err := stringsToCSV(keep)
-			e.env.HandleError(err)
+			HandleError(L, err)
 			L.Push(lua.LString(s))
 			keep = nil
 			return 1
@@ -153,7 +152,7 @@ func (e Encodings) ToCSV(L *lua.LState) int {
 				})
 				sort.Strings(header)
 				s, err := stringsToCSV(header)
-				e.env.HandleError(err)
+				HandleError(L, err)
 				L.Push(lua.LString(s))
 			} else {
 				var xs []string
@@ -171,7 +170,7 @@ func (e Encodings) ToCSV(L *lua.LState) int {
 					}
 				}
 				s, err := stringsToCSV(xs)
-				e.env.HandleError(err)
+				HandleError(L, err)
 				L.Push(lua.LString(s))
 			}
 			return 1
@@ -297,7 +296,7 @@ func (e Encodings) FromCSV(L *lua.LState) int {
 		if err == io.EOF {
 			return 0
 		}
-		e.env.HandleError(err)
+		HandleError(L, err)
 
 		header = uniqueHeader(header)
 	}
@@ -310,7 +309,7 @@ func (e Encodings) FromCSV(L *lua.LState) int {
 			L.Push(lua.LNil)
 			return 1
 		}
-		e.env.HandleError(err)
+		HandleError(L, err)
 
 		tbl := L.NewTable()
 		if useHeader {
@@ -403,15 +402,13 @@ func (e Encodings) ToXML(L *lua.LState) int {
 
 	var b strings.Builder
 
-	err := AsyncRun(e.env, func() error {
+	AsyncRun(e.env, L, func() (struct{}, error) {
 		enc := xml.NewEncoder(&b)
 
 		encodeXML(enc, v)
 
-		return enc.Flush()
+		return struct{}{}, enc.Flush()
 	})
-
-	e.env.HandleError(err)
 
 	L.Push(lua.LString(b.String()))
 	return 1
@@ -460,7 +457,7 @@ func (e Encodings) FromXML(L *lua.LState) int {
 			L.Push(lua.LNil)
 			return 1
 		}
-		e.env.HandleError(err)
+		HandleError(L, err)
 
 		if start, ok := tok.(xml.StartElement); ok {
 			tbl := decodeXML(dec, start, L)

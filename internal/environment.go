@@ -62,14 +62,14 @@ func (env *Environment) Close() error {
 	return nil
 }
 
-func (env *Environment) HandleError(err error) {
+func HandleError(L *lua.LState, err error) {
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) {
-			env.lua.RaiseError("timeout")
+			L.RaiseError("timeout")
 		} else if errors.Is(err, context.Canceled) {
-			env.lua.RaiseError("interrupted")
+			L.RaiseError("interrupted")
 		} else {
-			env.lua.RaiseError("%s", err)
+			L.RaiseError("%s", err)
 		}
 	}
 }
@@ -85,10 +85,12 @@ func (env *Environment) Yield() {
 }
 
 // AsyncRun makes a chance to execute callback function while executing a heavy function.
-func AsyncRun[T any](env *Environment, f func() T) T {
+func AsyncRun[T any](env *Environment, L *lua.LState, f func() (T, error)) T {
 	env.Unlock()
 	defer env.Lock()
-	return f()
+	x, err := f()
+	HandleError(L, err)
+	return x
 }
 
 // CallEventHandler calls an event callback function with GIL.

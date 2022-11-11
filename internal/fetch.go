@@ -261,9 +261,8 @@ func RegisterFetch(ctx context.Context, env *Environment) {
 		type Ret struct {
 			Resp *http.Response
 			Body []byte
-			Err  error
 		}
-		ret := AsyncRun(env, func() Ret {
+		ret := AsyncRun(env, L, func() (Ret, error) {
 			c := ctx
 			if timeout > 0 {
 				var cancel context.CancelFunc
@@ -273,21 +272,20 @@ func RegisterFetch(ctx context.Context, env *Environment) {
 
 			req, err := http.NewRequestWithContext(c, method, url, body)
 			if err != nil {
-				return Ret{nil, nil, err}
+				return Ret{nil, nil}, err
 			}
 			req.Header = header
 
 			resp, err := (&http.Client{Jar: cookiejar}).Do(req)
 			if err != nil {
-				return Ret{nil, nil, err}
+				return Ret{nil, nil}, err
 			}
 
 			body, err := io.ReadAll(resp.Body)
 			resp.Body.Close()
 
-			return Ret{resp, body, err}
+			return Ret{resp, body}, err
 		})
-		env.HandleError(ret.Err)
 
 		L.Push(PackFetchResponse(env, L, ret.Resp, bytes.NewReader(ret.Body)))
 		L.Push(cookiejar.ToLua(L))

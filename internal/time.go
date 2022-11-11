@@ -20,7 +20,7 @@ func RegisterTime(ctx context.Context, env *Environment) {
 			env.RecordOnAllTabs(L, fmt.Sprintf("time.sleep(%f)", n))
 
 			dur := time.Duration(n * float64(time.Millisecond))
-			err := AsyncRun(env, func() error {
+			AsyncRun(env, L, func() (struct{}, error) {
 				var err error
 				timer := time.NewTimer(dur)
 				select {
@@ -30,9 +30,8 @@ func RegisterTime(ctx context.Context, env *Environment) {
 					err = ctx.Err()
 				}
 				timer.Stop()
-				return err
+				return struct{}{}, err
 			})
-			env.HandleError(err)
 
 			env.RecordOnAllTabs(L, fmt.Sprintf("time.sleep(%f)", n))
 			return 0

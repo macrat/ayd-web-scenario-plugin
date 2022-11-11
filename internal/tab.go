@@ -93,7 +93,7 @@ func NewTab(ctx context.Context, L *lua.LState, env *Environment, id int) *Tab {
 		L.ArgError(1, "a nil, a string, or a table expected.")
 	}
 
-	t := AsyncRun(env, func() *Tab {
+	t := AsyncRun(env, L, func() (*Tab, error) {
 		ctx, cancel := chromedp.NewContext(ctx)
 		t := &Tab{
 			ctx:     ctx,
@@ -110,7 +110,7 @@ func NewTab(ctx context.Context, L *lua.LState, env *Environment, id int) *Tab {
 			requestEvent:  NewEventHandler((*Tab).HandleEvent),
 			responseEvent: NewEventHandler((*Tab).HandleEvent),
 		}
-		t.RunInCallback(
+		err := t.RunInCallback(
 			browser.SetDownloadBehavior(browser.SetDownloadBehaviorBehaviorAllow).WithDownloadPath(env.storage.Dir).WithEventsEnabled(true),
 			chromedp.Emulate(device.Info{
 				UserAgent: userAgent,
@@ -119,7 +119,7 @@ func NewTab(ctx context.Context, L *lua.LState, env *Environment, id int) *Tab {
 				Scale:     1,
 			}),
 		)
-		return t
+		return t, err
 	})
 
 	if recording || env.EnableRecording {
@@ -252,15 +252,15 @@ func (t *Tab) RecordOnce(L *lua.LState, taskName string) {
 }
 
 // RunCallback execute browser action without to release GIL.
-func (t *Tab) RunInCallback(actions ...chromedp.Action) {
-	t.env.HandleError(chromedp.Run(t.ctx, actions...))
+func (t *Tab) RunInCallback(actions ...chromedp.Action) error {
+	return chromedp.Run(t.ctx, actions...)
 }
 
 func (t *Tab) Run(L *lua.LState, taskName string, capture bool, timeout time.Duration, action ...chromedp.Action) {
 	where := L.Where(1)
 	t.env.StartTask(where, taskName)
 
-	err := AsyncRun(t.env, func() error {
+	AsyncRun(t.env, L, func() (struct{}, error) {
 		ctx := t.ctx
 		if timeout > 0 {
 			var cancel context.CancelFunc
@@ -276,24 +276,23 @@ func (t *Tab) Run(L *lua.LState, taskName string, capture bool, timeout time.Dur
 				t.recorder.Record(where, &buf),
 			)
 		}
-		return chromedp.Run(ctx, action...)
+		return struct{}{}, chromedp.Run(ctx, action...)
 	})
-	t.env.HandleError(err)
 }
 
 func (t *Tab) RunSelector(L *lua.LState, taskName string, action ...chromedp.Action) {
 	t.env.StartTask(L.Where(1), taskName)
 
-	err := AsyncRun(t.env, func() error {
+	AsyncRun(t.env, L, func() (struct{}, error) {
 		ctx, cancel := context.WithTimeout(t.ctx, time.Second)
 		defer cancel()
 
-		return chromedp.Run(ctx, action...)
+		err := chromedp.Run(ctx, action...)
+		if errors.Is(err, context.DeadlineExceeded) {
+			return struct{}{}, errors.New("no such element")
+		}
+		return struct{}{}, err
 	})
-	if errors.Is(err, context.DeadlineExceeded) {
-		L.RaiseError("no such element")
-	}
-	t.env.HandleError(err)
 }
 
 func (t *Tab) Save(name, ext string, data []byte) error {
@@ -319,7 +318,7 @@ func (t *Tab) Reload(L *lua.LState) {
 }
 
 func (t *Tab) Close() error {
-	AsyncRun(t.env, func() struct{} {
+	AsyncRun(t.env, t.env.lua, func() (struct{}, error) {
 		t.wg.Wait()
 
 		t.env.unregisterTab(t)
@@ -335,7 +334,7 @@ func (t *Tab) Close() error {
 		t.requestEvent.Close()
 		t.responseEvent.Close()
 
-		return struct{}{}
+		return struct{}{}, nil
 	})
 	return nil
 }
@@ -396,20 +395,19 @@ func (t *Tab) WaitEvent(L *lua.LState, taskName string, h *EventHandler) int {
 
 	t.env.StartTask(L.Where(1), taskName)
 
-	v := AsyncRun(t.env, func() *lua.LTable {
+	v := AsyncRun(t.env, L, func() (*lua.LTable, error) {
 		ctx := t.ctx
 		var cancel context.CancelFunc
 		if timeout >= 0 {
 			ctx, cancel = context.WithTimeout(t.ctx, timeout)
 			defer cancel()
 		}
-		return h.Wait(ctx)
+		v := h.Wait(ctx)
+		if v == nil {
+			return nil, errors.New("timeout")
+		}
+		return v, nil
 	})
-
-	if v == nil {
-		L.RaiseError("timeout")
-		return 0
-	}
 
 	t.RecordOnce(L, taskName)
 	L.Pop(L.GetTop() - 1)
