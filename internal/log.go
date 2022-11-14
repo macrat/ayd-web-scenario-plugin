@@ -85,7 +85,7 @@ func (l *Logger) HandleError(ctx context.Context, err error) {
 
 	if errors.Is(ctx.Err(), context.DeadlineExceeded) {
 		l.Extra["error"] = "timeout"
-		l.Status = ayd.StatusAborted
+		l.Status = ayd.StatusFailure
 	} else if errors.Is(ctx.Err(), context.Canceled) {
 		l.Extra["error"] = "interrupted"
 		l.Status = ayd.StatusAborted

@@ -138,8 +138,8 @@ func TestRun(t *testing.T) {
 			Timeout: 500 * time.Millisecond,
 		})
 
-		if r.Status != ayd.StatusAborted {
-			t.Errorf("expected ABORTED status but got %s", r.Status)
+		if r.Status != ayd.StatusFailure {
+			t.Errorf("expected FAILURE status but got %s", r.Status)
 		}
 
 		if r.Latency > 1*time.Second {
