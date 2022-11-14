@@ -10,6 +10,10 @@ if os.getenv("TEST_STATUS") then
     print.status(os.getenv("TEST_STATUS"))
 end
 
+if os.getenv("TEST_LATENCY") then
+    print.latency(tonumber(os.getenv("TEST_LATENCY")))
+end
+
 assert.eq(t("#greeting .target").text, os.getenv("TEST_TEXT"))
 
 if os.getenv("TEST_ERROR") then

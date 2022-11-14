@@ -452,6 +452,11 @@ The extra values will be stored in the Ayd execution log as is as possible.
 Set the status of the execution.
 The `status` argument must be one of `"healthy"`, `"unknown"`, `"degrade"`, `"failure"`, or `"aborted"`.
 
+#### `print.latency(millisecond)`
+
+Set `millisecond` as the latency of the execution.
+You can unset latency by using `nil` as `millisecond` in argument.
+
 
 Assert
 ------

@@ -150,8 +150,5 @@ func Run(arg Arg) ayd.Record {
 		logger.SetExtra("artifacts", xs)
 	}
 
-	r := logger.AsRecord()
-	r.Time = timestamp
-	r.Latency = latency
-	return r
+	return logger.AsRecord(timestamp, latency)
 }

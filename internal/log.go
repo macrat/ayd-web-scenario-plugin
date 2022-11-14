@@ -8,6 +8,7 @@ import (
 	"io"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/macrat/ayd/lib-ayd"
 	"github.com/yuin/gopher-lua"
@@ -16,11 +17,13 @@ import (
 type Logger struct {
 	sync.Mutex
 
-	Stream io.Writer
-	Debug  bool
-	Logs   []string
-	Status ayd.Status
-	Extra  map[string]any
+	Stream     io.Writer
+	Debug      bool
+	Logs       []string
+	Status     ayd.Status
+	Latency    time.Duration
+	LatencySet bool
+	Extra      map[string]any
 }
 
 func (l *Logger) Print(values ...lua.LValue) {
@@ -102,15 +105,21 @@ func (l *Logger) HandleError(ctx context.Context, err error) {
 	}
 }
 
-func (l *Logger) AsRecord() ayd.Record {
+func (l *Logger) AsRecord(timestamp time.Time, latency time.Duration) ayd.Record {
 	l.Lock()
 	defer l.Unlock()
 
-	return ayd.Record{
+	r := ayd.Record{
+		Time:    timestamp,
 		Status:  l.Status,
 		Message: strings.Join(l.Logs, "\n"),
+		Latency: latency,
 		Extra:   l.Extra,
 	}
+	if l.LatencySet {
+		r.Latency = l.Latency
+	}
+	return r
 }
 
 func (l *Logger) SetStatus(status string) {
@@ -121,6 +130,33 @@ func (l *Logger) SetStatus(status string) {
 
 	if l.Stream != nil {
 		fmt.Fprintf(l.Stream, "::status::%s\n", l.Status)
+	}
+}
+
+func (l *Logger) SetLatency(milliseconds float64) {
+	l.Lock()
+	defer l.Unlock()
+
+	if milliseconds < 0 {
+		milliseconds = 0
+	}
+
+	l.Latency = time.Duration(milliseconds * float64(time.Millisecond))
+	l.LatencySet = true
+
+	if l.Stream != nil {
+		fmt.Fprintf(l.Stream, "::latency::%f\n", milliseconds)
+	}
+}
+
+func (l *Logger) UnsetLatency() {
+	l.Lock()
+	defer l.Unlock()
+
+	l.LatencySet = false
+
+	if l.Stream != nil {
+		fmt.Fprintf(l.Stream, "::latency::\n")
 	}
 }
 
@@ -146,11 +182,25 @@ func RegisterLogger(L *lua.LState, logger *Logger) {
 			logger.SetStatus(strings.ToUpper(L.CheckString(1)))
 			return 0
 		},
+		"latency": func(L *lua.LState) int {
+			if L.Get(1).Type() == lua.LTNil {
+				logger.UnsetLatency()
+			} else {
+				logger.SetLatency(float64(L.CheckNumber(1)))
+			}
+			return 0
+		},
 		"extra": func(L *lua.LState) int {
 			key := L.CheckString(1)
 			switch strings.ToLower(key) {
-			case "time", "status", "latency", "target", "message":
-				L.RaiseError("print.extra can not set %q", key)
+			case "message":
+				L.RaiseError("print.extra() can not set message. please use print().")
+			case "status":
+				L.RaiseError("print.extra() can not set status. please use print.status().")
+			case "latency":
+				L.RaiseError("print.extra() can not set latency. please use print.latency().")
+			case "time", "target":
+				L.RaiseError("print.extra() can not set %s.", key)
 			default:
 				value := UnpackLValue(L.CheckAny(2))
 				logger.SetExtra(key, value)
