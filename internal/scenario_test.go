@@ -229,3 +229,38 @@ func Test_testSenarios(t *testing.T) {
 		})
 	}
 }
+
+func Test_errorInEvent(t *testing.T) {
+	t.Parallel()
+
+	server := StartTestServer()
+	t.Cleanup(server.Close)
+
+	ctx, cancel := NewContext(Arg{Mode: "ayd", Timeout: 5 * time.Minute}, nil)
+	t.Cleanup(cancel)
+
+	target, _ := ayd.ParseURL("web-scenario://foo:bar@/dummy/script.lua?hello=world&hoge=fuga#piyo")
+
+	s, err := NewStorage(t.TempDir(), time.Now())
+	if err != nil {
+		t.Fatalf("failed to prepare storage: %s", err)
+	}
+
+	logger := &Logger{Stream: (*DebugWriter)(t)}
+	env := NewEnvironment(ctx, logger, s, Arg{Mode: "ayd", Args: []string{"abc", "def"}, Target: target})
+	defer env.Close()
+
+	RegisterTestUtil(env.lua, s, server)
+
+	expect := `testdata/error-in-event.lua:4: test error
+stack traceback:
+	[G]: in function 'error'
+	testdata/error-in-event.lua:4: in main chunk
+	[G]: ?`
+
+	if err := env.DoFile("testdata/error-in-event.lua"); err == nil {
+		t.Fatalf("expected error but got nil")
+	} else if err.Error() != expect {
+		t.Fatalf("unexpected error:\n%s", err)
+	}
+}

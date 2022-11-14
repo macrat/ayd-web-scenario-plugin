@@ -18,22 +18,29 @@ type Environment struct {
 	sync.Mutex // this mutex works like the GIL in Python.
 
 	lua     *lua.LState
+	ctx     context.Context
+	stop    context.CancelFunc
 	tabs    []*Tab
 	logger  *Logger
 	storage *Storage
 	saveWG  sync.WaitGroup
+	errch   chan error
 
 	EnableRecording bool
 }
 
 func NewEnvironment(ctx context.Context, logger *Logger, s *Storage, arg Arg) *Environment {
 	L := lua.NewState()
+	ctx, stop := context.WithCancel(ctx)
 	L.SetContext(ctx)
 
 	env := &Environment{
 		lua:     L,
+		ctx:     ctx,
+		stop:    stop,
 		logger:  logger,
 		storage: s,
+		errch:   make(chan error, 1),
 	}
 	env.Lock()
 
@@ -58,7 +65,9 @@ func (env *Environment) Close() error {
 		t.Close()
 	}
 	env.lua.Close()
+	env.stop()
 	env.saveWG.Wait()
+	close(env.errch)
 	return nil
 }
 
@@ -75,7 +84,27 @@ func HandleError(L *lua.LState, err error) {
 }
 
 func (env *Environment) DoFile(path string) error {
-	return env.lua.DoFile(path)
+	done := make(chan struct{})
+
+	go func() {
+		err := env.lua.DoFile(path)
+		if err != nil {
+			env.errch <- err
+		}
+		close(done)
+	}()
+
+	var err error
+	select {
+	case <-done:
+	case err = <-env.errch:
+		env.stop()
+		<-done
+		ctx, stop := context.WithCancel(env.ctx)
+		env.lua.SetContext(ctx)
+		env.stop = stop
+	}
+	return err
 }
 
 // Yield makes a chance to execute callback function.
@@ -103,7 +132,7 @@ func (env *Environment) CallEventHandler(f *lua.LFunction, arg *lua.LTable, nret
 
 	L.Push(f)
 	L.Push(arg)
-	L.Call(1, nret)
+	env.errch <- L.PCall(1, nret, nil)
 
 	var result []lua.LValue
 	for i := 1; i <= nret; i++ {
