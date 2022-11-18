@@ -76,32 +76,18 @@ func (l *Logger) HandleError(ctx context.Context, err error) {
 	l.Lock()
 	defer l.Unlock()
 
-	if l.Extra == nil {
-		l.Extra = make(map[string]any)
-	}
+	msg := err.Error()
 
-	var apierr *lua.ApiError
-	if errors.As(err, &apierr) {
-		err = errors.New(strings.TrimRight(apierr.Object.String(), "\n"))
-		l.Extra["trace"] = apierr.StackTrace
-	}
-
-	if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-		l.Extra["error"] = "timeout"
-		l.Status = ayd.StatusFailure
-	} else if errors.Is(ctx.Err(), context.Canceled) {
-		l.Extra["error"] = "interrupted"
+	if errors.Is(ctx.Err(), context.Canceled) {
 		l.Status = ayd.StatusAborted
 	} else {
-		l.Extra["error"] = err.Error()
 		l.Status = ayd.StatusFailure
 	}
 
+	l.Logs = append(l.Logs, strings.TrimRight(msg, "\n"))
+
 	if l.Stream != nil {
-		fmt.Fprintln(l.Stream, l.Extra["error"])
-		if t, ok := l.Extra["trace"]; ok {
-			fmt.Fprintln(l.Stream, t)
-		}
+		fmt.Fprint(l.Stream, msg)
 	}
 }
 

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"testing"
 	"time"
+	"strings"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/macrat/ayd/lib-ayd"
@@ -31,7 +32,6 @@ func TestRun(t *testing.T) {
 			Record: ayd.Record{
 				Status:  ayd.StatusHealthy,
 				Message: "It's working!",
-				Extra:   nil,
 			},
 		},
 		{
@@ -42,7 +42,6 @@ func TestRun(t *testing.T) {
 				Status:  ayd.StatusDegrade,
 				Message: "It's working!",
 				Latency: 123 * time.Millisecond,
-				Extra:   nil,
 			},
 		},
 		{
@@ -53,7 +52,6 @@ func TestRun(t *testing.T) {
 				Status:  ayd.StatusUnknown,
 				Latency: 1 * time.Millisecond,
 				Message: "It's working!",
-				Extra:   nil,
 			},
 		},
 		{
@@ -61,11 +59,14 @@ func TestRun(t *testing.T) {
 			Latency: "0",
 			Record: ayd.Record{
 				Status:  ayd.StatusFailure,
-				Message: "It's working!",
-				Extra: map[string]any{
-					"error": `./testdata/run-test.lua:17: assertion failed: "world" == "incorrect"`,
-					"trace": "stack traceback:\n\t[G]: in function 'eq'\n\t./testdata/run-test.lua:17: in main chunk\n\t[G]: ?",
-				},
+				Message: strings.Join([]string{
+					`It's working!`,
+					`./testdata/run-test.lua:17: assertion failed: "world" == "incorrect"`,
+					`stack traceback:`,
+					`	[G]: in function 'eq'`,
+					`	./testdata/run-test.lua:17: in main chunk`,
+					`	[G]: ?`,
+				}, "\n"),
 			},
 		},
 		{
@@ -75,11 +76,16 @@ func TestRun(t *testing.T) {
 			Extra:   "hello",
 			Record: ayd.Record{
 				Status:  ayd.StatusFailure,
-				Message: "It's working!",
+				Message: strings.Join([]string{
+					`It's working!`,
+					`./testdata/run-test.lua:17: assertion failed: "world" == "incorrect"`,
+					`stack traceback:`,
+					`	[G]: in function 'eq'`,
+					`	./testdata/run-test.lua:17: in main chunk`,
+					`	[G]: ?`,
+				}, "\n"),
 				Extra: map[string]any{
-					"msg":   "hello",
-					"error": `./testdata/run-test.lua:17: assertion failed: "world" == "incorrect"`,
-					"trace": "stack traceback:\n\t[G]: in function 'eq'\n\t./testdata/run-test.lua:17: in main chunk\n\t[G]: ?",
+					"msg": "hello",
 				},
 			},
 		},
@@ -101,11 +107,14 @@ func TestRun(t *testing.T) {
 			Error:   "something",
 			Record: ayd.Record{
 				Status:  ayd.StatusFailure,
-				Message: "It's working!",
-				Extra: map[string]any{
-					"error": "./testdata/run-test.lua:20: something",
-					"trace": "stack traceback:\n\t[G]: in function 'error'\n\t./testdata/run-test.lua:20: in main chunk\n\t[G]: ?",
-				},
+				Message: strings.Join([]string{
+					`It's working!`,
+					`./testdata/run-test.lua:20: something`,
+					`stack traceback:`,
+					`	[G]: in function 'error'`,
+					`	./testdata/run-test.lua:20: in main chunk`,
+					`	[G]: ?`,
+				}, "\n"),
 			},
 		},
 	}
@@ -157,7 +166,15 @@ func TestRun(t *testing.T) {
 			t.Errorf("unexpected latency: %s", r.Latency)
 		}
 
-		if r.Message != "I'm gonna be timeout" {
+		expect := strings.Join([]string{
+			`I'm gonna be timeout`,
+			`./testdata/timeout.lua:2: timeout`,
+			`stack traceback:`,
+			`	[G]: in function 'sleep'`,
+			`	./testdata/timeout.lua:2: in main chunk`,
+			`	[G]: ?`,
+		}, "\n")
+		if r.Message != expect {
 			t.Errorf("unexpected message: %q", r.Message)
 		}
 	})
