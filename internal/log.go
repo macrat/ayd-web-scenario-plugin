@@ -78,7 +78,9 @@ func (l *Logger) HandleError(ctx context.Context, err error) {
 
 	msg := err.Error()
 
-	if errors.Is(ctx.Err(), context.Canceled) {
+	if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+		l.Status = ayd.StatusUnknown
+	} else if errors.Is(ctx.Err(), context.Canceled) {
 		l.Status = ayd.StatusAborted
 	} else {
 		l.Status = ayd.StatusFailure

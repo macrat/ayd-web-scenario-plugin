@@ -158,7 +158,7 @@ func TestRun(t *testing.T) {
 			Timeout: 500 * time.Millisecond,
 		})
 
-		if r.Status != ayd.StatusFailure {
+		if r.Status != ayd.StatusUnknown {
 			t.Errorf("expected FAILURE status but got %s", r.Status)
 		}
 
