@@ -16,12 +16,19 @@ func Test_pcall(t *testing.T) {
 		{`return "success on " .. msg`, []any{true, "success on wah"}},
 		{`return "success", msg`, []any{true, "success", "wah"}},
 		{`error("error on " .. msg)`, []any{false, "<string>:3: error on wah"}},
+		{`native()`, []any{false, "<string>:3: native error"}},
 	}
 
 	for i, tt := range tests {
 		tt := tt
 		t.Run(fmt.Sprint(i), func(t *testing.T) {
 			L := NewTestState(t)
+
+			L.PushFunction(func(L *lua.State) int {
+				L.Errorf(1, "native error")
+				return 0
+			})
+			L.SetGlobal("native")
 
 			err := L.LoadString(`
 				function f(msg)

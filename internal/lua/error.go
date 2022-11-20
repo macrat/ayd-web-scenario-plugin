@@ -11,8 +11,12 @@ type Error struct {
 	Traceback   string
 }
 
+func (err Error) OneLine() string {
+	return fmt.Sprintf("%s:%d: %s", err.ChunkName, err.CurrentLine, err.Err)
+}
+
 func (err Error) Error() string {
-	return fmt.Sprintf("%s:%d: %s\n%s", err.ChunkName, err.CurrentLine, err.Err, err.Traceback)
+	return err.OneLine() + "\n" + err.Traceback
 }
 
 func (err Error) Unwrap() error {
@@ -28,9 +32,10 @@ func pcall(L *State) int {
 	} else {
 		L.PushBoolean(false)
 		if e, ok := err.(Error); ok {
-			err = e.Err
+			L.PushString(e.OneLine())
+		} else {
+			L.PushString(err.Error())
 		}
-		L.PushString(err.Error())
 		return 2
 	}
 }
