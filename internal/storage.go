@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/yuin/gopher-lua"
+	"github.com/macrat/ayd-web-scenario/internal/lua"
 )
 
 type Storage struct {
@@ -133,62 +133,76 @@ func (s *Storage) Artifacts() []string {
 	return append(make([]string, 0, len(s.artifacts)), s.artifacts...)
 }
 
-func (s *Storage) Register(env *Environment) {
-	env.RegisterTable("artifact", map[string]lua.LValue{
-		"open": env.NewFunction(func(L *lua.LState) int {
+func (s *Storage) Register(env *Environment, L *lua.State) {
+	L.CreateTable(0, 2)
+
+	L.SetFuncs(-1, map[string]lua.GFunction{
+		"open": func(L *lua.State) int {
 			env.Yield()
 
 			path := filepath.Join(s.Dir, L.CheckString(1))
-			mode := L.OptString(2, "r")
-			L.Pop(L.GetTop())
+			mode := L.ToString(2)
+			if mode == "" {
+				mode = "r"
+			}
+			L.SetTop(0)
 
 			if !strings.HasPrefix(mode, "r") {
 				if err := s.mkdir(path); err != nil {
-					L.RaiseError("%s", err)
+					L.Error(1, err)
 				}
 				s.Lock()
 				s.appendArtifact(path)
 				s.Unlock()
 			}
 
-			L.Push(L.GetField(L.GetGlobal("io"), "open"))
-			L.Push(lua.LString(path))
-			L.Push(lua.LString(mode))
-			L.Call(2, 2)
-			return L.GetTop()
-		}),
-		"remove": env.NewFunction(func(L *lua.LState) int {
+			L.GetGlobal("io")
+			L.GetField(-1, "open")
+			L.Remove(1)
+
+			L.PushString(path)
+			L.PushString(mode)
+			if err := L.Call(2, 2); err != nil {
+				L.Error(1, err)
+			}
+			return 2
+		},
+		"remove": func(L *lua.State) int {
 			env.Yield()
 
 			path := filepath.Join(s.Dir, L.CheckString(1))
 			if err := s.Remove(path); err != nil {
-				L.RaiseError("%s", err)
+				L.Error(1, err)
 			}
 
 			return 0
-		}),
-	}, map[string]lua.LValue{
-		"__index": env.NewFunction(func(L *lua.LState) int {
-			env.Yield()
-
-			switch L.CheckString(2) {
-			case "path":
-				L.Push(lua.LString(s.Dir))
-				return 1
-			case "list":
-				ls := L.NewTable()
-				for _, x := range s.Artifacts() {
-					p, err := filepath.Rel(s.Dir, x)
-					if err == nil {
-						ls.Append(lua.LString(p))
-					} else {
-						ls.Append(lua.LString(x))
-					}
-				}
-				L.Push(ls)
-				return 1
-			}
-			return 0
-		}),
+		},
 	})
+
+	L.CreateTable(0, 1)
+	L.SetFunction(-1, "__index", func(L *lua.State) int {
+		env.Yield()
+
+		switch L.CheckString(2) {
+		case "path":
+			L.PushString(s.Dir)
+			return 1
+		case "list":
+			ls := s.Artifacts()
+			L.CreateTable(len(ls), 0)
+			for i, x := range ls {
+				p, err := filepath.Rel(s.Dir, x)
+				if err == nil {
+					L.PushString(p)
+				} else {
+					L.PushString(x)
+				}
+				L.SetI(-2, i+1)
+			}
+			return 1
+		}
+		return 0
+	})
+
+	L.SetGlobal("artifact")
 }

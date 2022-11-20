@@ -4,8 +4,8 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/macrat/ayd-web-scenario/internal/lua"
 	"github.com/macrat/ayd/lib-ayd"
-	"github.com/yuin/gopher-lua"
 )
 
 type Arg struct {
@@ -47,54 +47,61 @@ func (a Arg) Path() string {
 	}
 }
 
-func URLToTable(L *lua.LState, u *ayd.URL) *lua.LTable {
-	tbl := L.NewTable()
+func PushURLTable(L *lua.State, u *ayd.URL) {
+	L.CreateTable(0, 5)
 
-	L.SetField(tbl, "url", lua.LString(u.String()))
+	L.SetString(-1, "url", u.String())
+
 	if u.User != nil {
-		L.SetField(tbl, "username", lua.LString(u.User.Username()))
+		L.SetString(-1, "username", u.User.Username())
 		if p, ok := u.User.Password(); ok {
-			L.SetField(tbl, "password", L.NewFunction(func(L *lua.LState) int {
-				L.Push(lua.LString(p))
+			L.SetFunction(-1, "password", func(L *lua.State) int {
+				L.PushString(p)
 				return 1
-			}))
+			})
 		}
 	}
 
-	qs := L.NewTable()
-	L.SetField(tbl, "query", qs)
+	qs := u.ToURL().Query()
+	L.CreateTable(0, len(qs))
 	for k, v := range u.ToURL().Query() {
-		L.SetField(qs, k, lua.LString(v[len(v)-1]))
+		L.SetString(-1, k, v[len(v)-1])
 	}
+	L.SetField(-2, "query")
 
-	L.SetField(tbl, "fragment", lua.LString(u.Fragment))
-
-	return tbl
+	L.SetString(-1, "fragment", u.Fragment)
 }
 
-func (a Arg) Register(L *lua.LState) {
-	tbl := L.NewTable()
+func (a Arg) Register(L *lua.State) {
+	L.CreateTable(len(a.Args), 0)
+	TABLE := L.GetTop()
 
-	for _, x := range a.Args {
-		tbl.Append(lua.LString(x))
+	for i, x := range a.Args {
+		L.PushString(x)
+		L.SetI(TABLE, i+1)
 	}
 
-	L.SetField(tbl, "mode", lua.LString(a.Mode))
-	L.SetField(tbl, "target", URLToTable(L, a.Target))
-	L.SetField(tbl, "debug", lua.LBool(a.Debug))
-	L.SetField(tbl, "head", lua.LBool(a.Head))
-	L.SetField(tbl, "recording", lua.LBool(a.Recording))
+	L.SetString(TABLE, "mode", a.Mode)
+	PushURLTable(L, a.Target)
+	L.SetField(TABLE, "target")
+	L.SetBoolean(TABLE, "debug", a.Debug)
+	L.SetBoolean(TABLE, "head", a.Head)
+	L.SetBoolean(TABLE, "recording", a.Recording)
 
 	if a.Alert.Target != nil {
-		ar := L.NewTable()
-		L.SetField(ar, "time", lua.LNumber(a.Alert.Time.UnixMilli()))
-		L.SetField(ar, "status", lua.LString(a.Alert.Status.String()))
-		L.SetField(ar, "latency", lua.LNumber(float64(a.Alert.Latency.Microseconds())/1000.0))
-		L.SetField(ar, "target", lua.LString(a.Alert.Target.String()))
-		L.SetField(ar, "message", lua.LString(a.Alert.Message))
-		L.SetField(ar, "extra", PackLValue(L, a.Alert.Extra))
-		L.SetField(tbl, "alert", ar)
+		L.CreateTable(0, 6)
+		{
+			L.SetInteger(-1, "time", a.Alert.Time.UnixMilli())
+			L.SetString(-1, "status", a.Alert.Status.String())
+			L.SetNumber(-1, "latency", float64(a.Alert.Latency.Microseconds())/1000.0)
+			L.SetString(-1, "target", a.Alert.Target.String())
+			L.SetString(-1, "message", a.Alert.Message)
+
+			L.PushAny(a.Alert.Extra)
+			L.SetField(-2, "extra")
+		}
+		L.SetField(TABLE, "alert")
 	}
 
-	L.SetGlobal("arg", tbl)
+	L.SetGlobal("arg")
 }

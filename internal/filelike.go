@@ -5,64 +5,70 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/yuin/gopher-lua"
+	"github.com/macrat/ayd-web-scenario/internal/lua"
 )
 
-func AsFileLikeMeta(L *lua.LState, r io.Reader) *lua.LTable {
-	idx := L.NewTable()
-	L.SetMetatable(idx, L.GetTypeMetatable("filelike"))
+func PushFileLikeMeta(L *lua.State, r io.Reader) {
+	L.CreateTable(0, 0)
 
-	ud := L.NewUserData()
-	ud.Value = bufio.NewReader(r)
-	L.SetField(idx, "_reader", ud)
+	L.CreateTable(0, 1)
+	{
+		L.GetTypeMetatable("filelike")
+		L.SetNil(-1, "__name")
+		L.SetMetatable(-2)
 
-	meta := L.NewTable()
-	L.SetField(meta, "__index", idx)
-	return meta
+		L.PushUserdata(bufio.NewReader(r))
+		L.SetField(-2, "_reader")
+	}
+	L.SetField(-2, "__index")
 }
 
-func RegisterFileLike(L *lua.LState) {
-	checkFileReader := func(L *lua.LState) *bufio.Reader {
-		ud, ok := L.GetField(L.Get(1), "_reader").(*lua.LUserData)
-		if !ok {
-			L.ArgError(1, "_reader field expected")
+func RegisterFileLike(L *lua.State) {
+	checkFileReader := func(L *lua.State) *bufio.Reader {
+		L.AssertType(1, lua.Table)
+
+		if typ := L.GetField(1, "_reader"); typ != lua.Userdata {
+			L.ArgErrorf(1, "_reader field is invalid, got %s", typ)
 		}
-		r, ok := ud.Value.(*bufio.Reader)
+		r, ok := L.ToUserdata(-1).(*bufio.Reader)
 		if !ok {
-			L.ArgError(1, "_reader field expected")
+			L.ArgErrorf(1, "_reader field is invalid")
 		}
+		L.Pop(1)
 		return r
 	}
 
-	meta := L.NewTypeMetatable("filelike")
-	L.SetField(meta, "__index", L.SetFuncs(L.NewTable(), map[string]lua.LGFunction{
-		"lines": func(L *lua.LState) int {
+	L.NewTypeMetatable("filelike")
+	L.CreateTable(0, 2)
+	L.SetFuncs(-1, map[string]lua.GFunction{
+		"lines": func(L *lua.State) int {
 			r := checkFileReader(L)
 
-			L.Push(L.NewFunction(func(L *lua.LState) int {
+			L.PushFunction(func(L *lua.State) int {
 				buf, _, err := r.ReadLine()
 				if err == io.EOF {
 					return 0
 				} else if err != nil {
-					L.RaiseError("%s", err)
+					L.Error(1, err)
 				}
-				L.Push(lua.LString(buf))
+				L.PushString(string(buf))
 				return 1
-			}))
+			})
 			return 1
 		},
-		"read": func(L *lua.LState) int {
+		"read": func(L *lua.State) int {
 			r := checkFileReader(L)
 			n := L.GetTop()
 
 			if n == 1 {
-				L.Push(lua.LString("l"))
+				L.PushString("l")
 				n = 2
 			}
 
 			for i := 2; i <= n; i++ {
-				switch format := L.Get(i).(type) {
-				case lua.LString:
+				switch L.Type(i) {
+				case lua.String:
+					format := L.ToString(i)
 					if format[:1] == "*" {
 						format = format[1:]
 					}
@@ -73,48 +79,49 @@ func RegisterFileLike(L *lua.LState) {
 						if err == io.EOF {
 							return i - 2
 						} else if err != nil {
-							L.RaiseError("%s", err)
+							L.Error(1, err)
 						}
-						L.Push(lua.LNumber(buf))
+						L.PushNumber(buf)
 					case "a":
 						buf, err := io.ReadAll(r)
 						if err == io.EOF {
 							return i - 2
 						} else if err != nil {
-							L.RaiseError("%s", err)
+							L.Error(1, err)
 						}
-						L.Push(lua.LString(buf))
+						L.PushString(string(buf))
 					case "l", "L", "":
 						buf, _, err := r.ReadLine()
 						if err == io.EOF {
 							return i - 2
 						} else if err != nil {
-							L.RaiseError("%s", err)
+							L.Error(1, err)
 						}
 						if format[:1] == "L" {
 							buf = append(buf, '\n')
 						}
-						L.Push(lua.LString(buf))
+						L.PushString(string(buf))
 					default:
-						L.ArgError(i, fmt.Sprintf("invalid format %q", L.ToString(i)))
+						L.ArgErrorf(i, "invalid format %q", L.ToString(i)) // don't use format because it drops "*".
 					}
-				case lua.LNumber:
-					buf := make([]byte, int(format))
+				case lua.Number:
+					buf := make([]byte, int(L.ToNumber(i)))
 					_, err := r.Read(buf)
 					if err == io.EOF {
 						return i - 2
 					} else if err != nil {
-						L.RaiseError("%s", err)
+						L.Error(1, err)
 					}
-					L.Push(lua.LString(buf))
+					L.PushString(string(buf))
 				default:
-					L.ArgError(i, "format string or number expected")
+					L.ArgErrorf(i, "string or number expected, got %s", L.Type(i))
 				}
 			}
 
 			return n - 1
 		},
-	}))
+	})
+	L.SetField(-2, "__index")
 }
 
 type DelayedReader struct {

@@ -11,7 +11,6 @@ import (
 	"image/png"
 	"io"
 	"os"
-	"strconv"
 	"strings"
 	"sync"
 
@@ -37,6 +36,7 @@ var (
 
 type recorderTask struct {
 	Where      string
+	Line       int
 	Screenshot *[]byte
 }
 
@@ -72,19 +72,6 @@ func NewRecorder(ctx context.Context, width, height int) *Recorder {
 	return rec
 }
 
-func parseWhere(where string) (string, int) {
-	where = where[:len(where)-1]
-	pos := strings.LastIndexByte(where, ':')
-	line, err := strconv.Atoi(where[pos+1:])
-	if err != nil {
-		return where[:pos], 0
-	}
-	if where[:pos] == "<repl>" {
-		return "<repl>", 0
-	}
-	return where[:pos], line
-}
-
 func (r *Recorder) runRecorder(ch <-chan recorderTask, width, height int) {
 	screenSize := image.Rect(0, 0, width, height)
 	recordSize := image.Rect(0, 0, width+SourceWidth, height)
@@ -99,8 +86,7 @@ func (r *Recorder) runRecorder(ch <-chan recorderTask, width, height int) {
 		img := image.NewPaletted(recordSize, Palette)
 		draw.FloydSteinberg.Draw(img, screenSize, orig, image.ZP)
 
-		where, line := parseWhere(task.Where)
-		sourceImager.LoadAsImage(img, image.Rect(width, 0, recordSize.Max.X, height), where, line)
+		sourceImager.LoadAsImage(img, image.Rect(width, 0, recordSize.Max.X, height), task.Where, task.Line)
 
 		r.images = append(r.images, img)
 	}
@@ -117,11 +103,12 @@ func (a RecordAction) Do(ctx context.Context) error {
 	return nil
 }
 
-func (r *Recorder) Record(where string, screenshot *[]byte) RecordAction {
+func (r *Recorder) Record(where string, line int, screenshot *[]byte) RecordAction {
 	return RecordAction{
 		ch: r.ch,
 		task: recorderTask{
 			Where:      where,
+			Line:       line,
 			Screenshot: screenshot,
 		},
 	}

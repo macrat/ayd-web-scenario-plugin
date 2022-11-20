@@ -128,7 +128,14 @@ func Run(arg Arg) ayd.Record {
 	ctx, cancel := NewContext(arg, browserlog)
 	defer cancel()
 
-	env := NewEnvironment(ctx, logger, storage, arg)
+	env, err := NewEnvironment(ctx, logger, storage, arg)
+	if err != nil {
+		return ayd.Record{
+			Time:    timestamp,
+			Status:  ayd.StatusFailure,
+			Message: err.Error(),
+		}
+	}
 	env.EnableRecording = arg.Recording
 
 	var latency time.Duration

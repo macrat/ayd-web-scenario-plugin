@@ -415,7 +415,7 @@ The `options` is a table and can have below fields.
 
 - `method`: HTTP method in string such as `"GET"` or `"POST"`. The default is `"GET"` normally, but it is `"POST"` if set non-nil value to `body`.
 - `headers`: A table that contains header key-values.
-- `body`: The body value for POST or PUT method. It is a string, a number, or an iterator function that returns each lines in string.
+- `body`: The body value for POST or PUT method.
 - `timeout`: Timeout duration in millisecond. The default is 5 minutes.
 
 The first return value is a table that response from the server, contains below fields.
@@ -563,8 +563,7 @@ Encode `value` into JSON string.
 
 #### `fromcsv(csv, [useheader])`
 
-Parse `csv` and make an iterator function.
-The parameter `csv` can be a string, a list table, or an iterator function that returns strings.
+Parse `csv` string, and make an iterator function.
 
 In default, the first row is used as the header, and each results will be key-value style.
 If the parameter `useheader` is `false`, this function does not use the first row as header and each results will be a list style.
@@ -573,7 +572,7 @@ The first of the result is an iterator function that returns each row values.
 And the second of the result is a list of header.
 
 ``` lua
-iter, header = fromcsv(io.open("path/to/input.csv"):lines())
+iter, header = fromcsv(io.open("path/to/input.csv"):read("a"))
 print(header)
 for row in iter do
   print(row)
@@ -582,7 +581,7 @@ end
 
 #### `tocsv(values, [header])`
 
-Make an iterator that encode `values` to CSV lines.
+Make an iterator that encode `values` to CSV string.
 
 The parameter `values` can be a table of tables, or an iterator function that returns a table.
 
@@ -598,17 +597,13 @@ If the `header` is not `false`, you can use values indexed by string or number, 
 Values that matched name by string has priority.
 
 ``` lua
-iter = tocsv({
+csv = tocsv({
   {hello="world", foo="bar"},
   {"number", "indexed"},
   {"you can", foo="combine"}
 }, {"hello", "foo"})
 
-f = io.open("path/to/output.csv")
-for row in iter do
-  f:write(row .. "\n")
-end
-f:close()
+io.open("path/to/output.csv", "w"):write(csv)
 ```
 
 ``` csv
@@ -623,8 +618,7 @@ you can,combine
 
 #### `fromxml(xml)`
 
-Parse `xml` as a XML and returns a table.
-The parameter `xml` can be a string, a list table, or an iterator function that returns strings.
+Parse `xml` string, and returns a table.
 
 ``` lua
 assert.eq(

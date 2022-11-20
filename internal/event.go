@@ -1,10 +1,11 @@
 package webscenario
 
+/*
 import (
 	"context"
 	"sync"
 
-	"github.com/yuin/gopher-lua"
+	"github.com/macrat/ayd-web-scenario/internal/lua"
 )
 
 type EventHandleFunc func(*Tab, *lua.LFunction, *lua.LTable)
@@ -93,3 +94,4 @@ func (h *EventHandler) Status(L *lua.LState) *lua.LTable {
 
 	return tbl
 }
+*/

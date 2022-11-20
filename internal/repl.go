@@ -7,16 +7,17 @@ import (
 	"strings"
 
 	"github.com/chzyer/readline"
-	"github.com/yuin/gopher-lua"
-	"github.com/yuin/gopher-lua/parse"
+	"github.com/macrat/ayd-web-scenario/internal/lua"
 )
 
 func isIncomplete(err error) bool {
+	/* TODO: implement this
 	if lerr, ok := err.(*lua.ApiError); ok {
 		if perr, ok := lerr.Cause.(*parse.Error); ok {
 			return perr.Pos.Line == parse.EOF
 		}
 	}
+	*/
 	return false
 }
 
@@ -61,10 +62,9 @@ func (env *Environment) DoREPL(ctx context.Context) error {
 		}
 
 		env.Lock()
-		if f, err := env.lua.Load(strings.NewReader("return "+code), "<repl>"); err == nil {
-			env.lua.Push(f)
-		} else if f, err := env.lua.Load(strings.NewReader(code), "<repl>"); err == nil {
-			env.lua.Push(f)
+		env.lua.SetTop(0)
+		if err := env.lua.Load(strings.NewReader("return "+code), "<repl>", false); err == nil {
+		} else if err := env.lua.Load(strings.NewReader(code), "<repl>", false); err == nil {
 		} else if isIncomplete(err) {
 			continue
 		} else {
@@ -75,23 +75,23 @@ func (env *Environment) DoREPL(ctx context.Context) error {
 
 		sourceImager.RecordStdin(strings.Split(code, "\n"))
 
-		if err = env.lua.PCall(0, lua.MultRet, nil); err != nil {
+		if err = env.lua.Call(0, lua.MultRet); err != nil {
 			env.logger.HandleError(ctx, err)
+			continue
 		}
 
-		if (code == "exit" || code == "quit" || code == "bye") && env.lua.GetTop() == 1 && env.lua.Get(1).Type() == lua.LTNil {
+		if (code == "exit" || code == "quit" || code == "bye") && env.lua.GetTop() == 1 && env.lua.Type(1) == lua.Nil {
 			fmt.Fprintln(rl, "Use os.exit() or Ctrl-D to exit.")
 		} else {
 			var xs []string
 			for i := 1; i <= env.lua.GetTop(); i++ {
-				xs = append(xs, string(env.lua.ToStringMeta(env.lua.Get(i)).(lua.LString)))
+				xs = append(xs, env.lua.ToString(i))
 			}
 			if len(xs) > 0 {
 				fmt.Fprintln(rl, strings.Join(xs, "\t"))
 			}
 		}
 
-		env.lua.Pop(env.lua.GetTop())
 		code = ""
 	}
 }
@@ -120,10 +120,5 @@ func (r *SourceRecordReader) Read(b []byte) (int, error) {
 }
 
 func (env *Environment) DoStream(r io.Reader, name string) error {
-	f, err := env.lua.Load(&SourceRecordReader{Upstream: r}, name)
-	if err != nil {
-		return err
-	}
-	env.lua.Push(f)
-	return env.lua.PCall(0, 0, nil)
+	return env.lua.Do(&SourceRecordReader{Upstream: r}, name, false)
 }

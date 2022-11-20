@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/macrat/ayd-web-scenario/internal/lua"
 	"github.com/macrat/ayd/lib-ayd"
-	"github.com/yuin/gopher-lua"
 )
 
 func Test_isIncomplete(t *testing.T) {
@@ -20,11 +20,14 @@ func Test_isIncomplete(t *testing.T) {
 		{"print'hello')", false},
 	}
 
-	L := lua.NewState()
+	L, err := lua.NewState()
+	if err != nil {
+		t.Fatalf("failed to prepare Lua: %s", err)
+	}
 	defer L.Close()
 
 	for _, tt := range tests {
-		_, err := L.LoadString(tt.Script)
+		err := L.LoadString(tt.Script)
 		actual := isIncomplete(err)
 		if actual != tt.Want {
 			t.Errorf("%s => expected %v but got %v", tt.Script, tt.Want, actual)
@@ -45,7 +48,10 @@ func TestEnvironment_DoStream(t *testing.T) {
 	}
 
 	var log strings.Builder
-	env := NewEnvironment(ctx, &Logger{Stream: &log}, storage, Arg{Mode: "stdin", Target: &ayd.URL{Scheme: "web-scenario", Opaque: "<stdin>"}, Timeout: 5 * time.Minute})
+	env, err := NewEnvironment(ctx, &Logger{Stream: &log}, storage, Arg{Mode: "stdin", Target: &ayd.URL{Scheme: "web-scenario", Opaque: "<stdin>"}, Timeout: 5 * time.Minute})
+	if err != nil {
+		t.Fatalf("failed to prepare environment: %s", err)
+	}
 	defer env.Close()
 
 	tests := []struct {

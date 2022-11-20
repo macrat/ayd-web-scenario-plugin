@@ -2,9 +2,9 @@ package webscenario
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 	"time"
-	"strings"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/macrat/ayd/lib-ayd"
@@ -58,7 +58,7 @@ func TestRun(t *testing.T) {
 			Text:    "incorrect",
 			Latency: "0",
 			Record: ayd.Record{
-				Status:  ayd.StatusFailure,
+				Status: ayd.StatusFailure,
 				Message: strings.Join([]string{
 					`It's working!`,
 					`./testdata/run-test.lua:17: assertion failed: "world" == "incorrect"`,
@@ -75,7 +75,7 @@ func TestRun(t *testing.T) {
 			Text:    "incorrect",
 			Extra:   "hello",
 			Record: ayd.Record{
-				Status:  ayd.StatusFailure,
+				Status: ayd.StatusFailure,
 				Message: strings.Join([]string{
 					`It's working!`,
 					`./testdata/run-test.lua:17: assertion failed: "world" == "incorrect"`,
@@ -106,7 +106,7 @@ func TestRun(t *testing.T) {
 			Text:    "world",
 			Error:   "something",
 			Record: ayd.Record{
-				Status:  ayd.StatusFailure,
+				Status: ayd.StatusFailure,
 				Message: strings.Join([]string{
 					`It's working!`,
 					`./testdata/run-test.lua:20: something`,
@@ -141,8 +141,8 @@ func TestRun(t *testing.T) {
 				t.Errorf("expected status is %s but got %s", tt.Record.Status, r.Status)
 			}
 
-			if r.Message != tt.Record.Message {
-				t.Errorf("expected message is %q but got %q", tt.Record.Message, r.Message)
+			if diff := cmp.Diff(tt.Record.Message, r.Message); diff != "" {
+				t.Errorf("unexpected message:\n%s", diff)
 			}
 
 			if diff := cmp.Diff(tt.Record.Extra, r.Extra); diff != "" {
@@ -150,32 +150,30 @@ func TestRun(t *testing.T) {
 			}
 		})
 	}
+}
 
-	t.Run("timeout", func(t *testing.T) {
-		r := Run(Arg{
-			Mode:    "ayd",
-			Target:  &ayd.URL{Scheme: "web-scenario", Opaque: "./testdata/timeout.lua"},
-			Timeout: 500 * time.Millisecond,
-		})
-
-		if r.Status != ayd.StatusUnknown {
-			t.Errorf("expected FAILURE status but got %s", r.Status)
-		}
-
-		if r.Latency > 1*time.Second {
-			t.Errorf("unexpected latency: %s", r.Latency)
-		}
-
-		expect := strings.Join([]string{
-			`I'm gonna be timeout`,
-			`./testdata/timeout.lua:2: timeout`,
-			`stack traceback:`,
-			`	[G]: in function 'sleep'`,
-			`	./testdata/timeout.lua:2: in main chunk`,
-			`	[G]: ?`,
-		}, "\n")
-		if r.Message != expect {
-			t.Errorf("unexpected message: %q", r.Message)
-		}
+func TestRun_timeout(t *testing.T) {
+	r := Run(Arg{
+		Mode:    "ayd",
+		Target:  &ayd.URL{Scheme: "web-scenario", Opaque: "./testdata/timeout.lua"},
+		Timeout: 200 * time.Millisecond,
 	})
+
+	if r.Status != ayd.StatusUnknown {
+		t.Errorf("expected FAILURE status but got %s", r.Status)
+	}
+
+	if r.Latency > 500*time.Millisecond {
+		t.Errorf("unexpected latency: %s", r.Latency)
+	}
+
+	expect := strings.Join([]string{
+		`I'm gonna be timeout`,
+		`./testdata/timeout.lua:2: timeout`,
+		`stack traceback:`,
+		`	./testdata/timeout.lua:2: in main chunk`,
+	}, "\n")
+	if diff := cmp.Diff(expect, r.Message); diff != "" {
+		t.Errorf("unexpected message:\n%s", diff)
+	}
 }

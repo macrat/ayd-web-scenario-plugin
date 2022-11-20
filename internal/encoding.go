@@ -10,238 +10,157 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/yuin/gopher-lua"
+	"github.com/macrat/ayd-web-scenario/internal/lua"
 )
 
 type Encodings struct {
 	env *Environment
 }
 
-func (e Encodings) ToJSON(L *lua.LState) int {
-	v := L.Get(1)
+func (e Encodings) ToJSON(L *lua.State) int {
+	v := L.ToAny(1)
 	s := AsyncRun(e.env, L, func() (string, error) {
-		bs, err := json.Marshal(UnpackLValue(v))
+		bs, err := json.Marshal(v)
 		return string(bs), err
 	})
-	L.Push(lua.LString(s))
+	L.PushString(s)
 	return 1
 }
 
-func (e Encodings) FromJSON(L *lua.LState) int {
+func (e Encodings) FromJSON(L *lua.State) int {
 	s := L.CheckString(1)
 	var v any
 	AsyncRun(e.env, L, func() (struct{}, error) {
 		err := json.Unmarshal([]byte(s), &v)
 		return struct{}{}, err
 	})
-	L.Push(PackLValue(L, v))
+	L.PushAny(v)
 	return 1
 }
 
-func ipairs(tbl *lua.LTable, f func(k, v lua.LValue)) {
-	for i := 0; ; i++ {
-		key := lua.LValue(lua.LNil)
-		if i > 0 {
-			key = lua.LNumber(i)
-		}
+func iiter(L *lua.State, index int) func() {
+	index = L.AbsIndex(index)
 
-		k, v := tbl.Next(key)
-		if v.Type() == lua.LTNil {
+	i := 1
+	max := int(L.Len(index))
+
+	return func() {
+		if i > max {
+			L.PushNil()
+		} else {
+			L.GetI(index, i)
+			i++
+		}
+	}
+}
+
+func (e Encodings) ToCSV(L *lua.State) int {
+	var next func()
+
+	CSV := 1
+	OPT := 2
+	ROW := 3
+
+	switch L.Type(CSV) {
+	case lua.Table:
+		next = iiter(L, CSV)
+	case lua.Function:
+		next = func() {
+			L.PushNil()
+			L.Copy(CSV, -1)
+			if err := L.Call(0, 1); err != nil {
+				L.Error(1, err)
+			}
 			return
 		}
-		if i == 0 {
-			if n, ok := k.(lua.LNumber); ok && n != 1 {
-				return
-			}
-		}
-
-		f(k, v)
+	default:
+		L.ArgErrorf(CSV, "table or function expected, got %s", L.Type(CSV))
 	}
-}
 
-func iiter(tbl *lua.LTable) func() lua.LValue {
-	i := 0
-	finished := false
-	return func() lua.LValue {
-		if finished {
-			return lua.LNil
-		}
-
-		key := lua.LValue(lua.LNil)
-		if i > 0 {
-			key = lua.LNumber(i)
-		}
-		i++
-
-		_, v := tbl.Next(key)
-		if v.Type() == lua.LTNil {
-			finished = true
-		}
-
-		return v
-	}
-}
-
-func stringsToCSV(ss []string) (string, error) {
 	var b strings.Builder
 	w := csv.NewWriter(&b)
-	if err := w.Write(ss); err != nil {
-		return "", err
-	}
-	w.Flush()
-	return strings.TrimSuffix(b.String(), "\n"), nil
-}
 
-func (e Encodings) ToCSV(L *lua.LState) int {
-	var next func() lua.LValue
-
-	switch v := L.Get(1).(type) {
-	case *lua.LTable:
-		next = iiter(v)
-	case *lua.LFunction:
-		next = func() lua.LValue {
-			L.Push(v)
-			L.Call(0, 1)
-			return L.Get(-1)
-		}
-	default:
-		L.ArgError(1, "table or function expected.")
-	}
-
-	var header, keep []string
+	var header []string
 	noheader := false
 
-	switch h := L.Get(2).(type) {
-	case *lua.LTable:
-		ipairs(h, func(k, v lua.LValue) {
-			header = append(header, lua.LVAsString(v))
-			keep = header
-		})
-	case lua.LBool:
-		noheader = !bool(h)
-	case *lua.LNilType:
+	switch L.Type(OPT) {
+	case lua.Table:
+		l := int(L.Len(OPT))
+
+		for i := 1; i <= l; i++ {
+			L.GetI(OPT, i)
+			header = append(header, L.ToString(-1))
+			L.Pop(1)
+		}
+		HandleError(L, w.Write(header))
+	case lua.Boolean:
+		noheader = !L.ToBoolean(OPT)
+	case lua.Nil:
 	default:
-		L.ArgError(2, "header property should be a nil or a table.")
+		L.ArgErrorf(OPT, "table, boolean, or nil expected, but got %s", L.Type(OPT))
 	}
 
-	L.Push(L.NewFunction(func(L *lua.LState) int {
-		e.env.Yield()
+	for i := 0; ; i++ {
+		next()
 
-		if keep != nil {
-			s, err := stringsToCSV(keep)
-			HandleError(L, err)
-			L.Push(lua.LString(s))
-			keep = nil
+		switch L.Type(ROW) {
+		case lua.Nil:
+			w.Flush()
+			L.PushString(b.String())
 			return 1
-		}
-
-		switch row := next().(type) {
-		case *lua.LNilType:
-			return 0
-		case *lua.LTable:
+		case lua.Table:
 			if header == nil && !noheader {
-				row.ForEach(func(k, v lua.LValue) {
-					x := lua.LVAsString(k)
-					if x != "" {
-						header = append(header, x)
-						keep = append(keep, lua.LVAsString(v))
+				var values []string
+
+				L.PushNil()
+				for L.Next(ROW) {
+					if L.Type(-2) == lua.String {
+						key := L.ToString(-2)
+
+						if key != "" {
+							header = append(header, key)
+							values = append(values, L.ToString(-1))
+						}
 					}
-				})
-				sort.Slice(keep, func(i, j int) bool {
-					return keep[i] < keep[j]
+					L.Pop(1)
+				}
+				sort.Slice(values, func(i, j int) bool {
+					return header[i] < header[j]
 				})
 				sort.Strings(header)
-				s, err := stringsToCSV(header)
-				HandleError(L, err)
-				L.Push(lua.LString(s))
+				HandleError(L, w.Write(header))
+				HandleError(L, w.Write(values))
 			} else {
 				var xs []string
 				if noheader {
-					ipairs(row, func(k, v lua.LValue) {
-						xs = append(xs, lua.LVAsString(v))
-					})
+					L.PushNil()
+					for L.Next(ROW) {
+						xs = append(xs, L.ToString(-1))
+						L.Pop(1)
+					}
 				} else {
 					for i, col := range header {
-						v := L.GetField(row, col)
-						if v.Type() == lua.LTNil {
-							v = row.RawGetInt(i + 1)
+						L.GetField(ROW, col)
+
+						if L.Type(-1) == lua.Nil {
+							L.Pop(1)
+							L.GetI(ROW, i+1)
 						}
-						xs = append(xs, lua.LVAsString(v))
+
+						xs = append(xs, L.ToString(-1))
+						L.Pop(1)
 					}
 				}
-				s, err := stringsToCSV(xs)
-				HandleError(L, err)
-				L.Push(lua.LString(s))
+				HandleError(L, w.Write(xs))
 			}
 			return 1
 		default:
-			L.RaiseError("a table expected.")
+			L.Errorf(ROW, "table or nil expected, got %s", L.Type(1))
 			return 0
 		}
-	}))
 
-	return 1
-}
-
-type iterReader struct {
-	done bool
-	buf  []byte
-	Fn   func() lua.LValue
-}
-
-func newReaderFromLFunction(L *lua.LState, f *lua.LFunction) *iterReader {
-	return &iterReader{
-		Fn: func() lua.LValue {
-			L.Push(f)
-			L.Call(0, 1)
-			return L.Get(-1)
-		},
+		L.Pop(1)
 	}
-}
-
-func (ir *iterReader) Read(p []byte) (n int, err error) {
-	if ir.done {
-		return 0, io.EOF
-	}
-
-	for len(p) > len(ir.buf) {
-		v := ir.Fn()
-		if v.Type() == lua.LTNil {
-			ir.done = true
-			if ir.buf == nil {
-				err = io.EOF
-			} else {
-				copy(p, ir.buf)
-				n = len(ir.buf)
-				ir.buf = nil
-			}
-			return
-		}
-		ir.buf = append(ir.buf, []byte(lua.LVAsString(v)+"\n")...)
-	}
-	copy(p, ir.buf)
-	n = len(p)
-	ir.buf = ir.buf[n:]
-	return
-}
-
-func checkReader(L *lua.LState, index int) io.Reader {
-	var r io.Reader
-
-	switch x := L.Get(index).(type) {
-	case lua.LString:
-		r = strings.NewReader(string(x))
-	case *lua.LTable:
-		r = &iterReader{
-			Fn: iiter(x),
-		}
-	case *lua.LFunction:
-		r = newReaderFromLFunction(L, x)
-	default:
-		L.ArgError(1, "string, table, or iterator function expected.")
-	}
-
-	return r
 }
 
 func uniqueHeader(xs []string) []string {
@@ -275,19 +194,17 @@ func uniqueHeader(xs []string) []string {
 	return rs
 }
 
-func (e Encodings) FromCSV(L *lua.LState) int {
-	r := checkReader(L, 1)
+func (e Encodings) FromCSV(L *lua.State) int {
+	c := csv.NewReader(strings.NewReader(L.CheckString(1)))
 
 	useHeader := true
-	switch x := L.Get(2).(type) {
-	case lua.LBool:
-		useHeader = bool(x)
-	case *lua.LNilType:
+	switch L.Type(2) {
+	case lua.Boolean:
+		useHeader = L.ToBoolean(2)
+	case lua.Nil:
 	default:
-		L.ArgError(2, "a boolean expected.")
+		L.ArgErrorf(2, "boolean expected, got %s", L.Type(2))
 	}
-
-	c := csv.NewReader(r)
 
 	var header []string
 	if useHeader {
@@ -301,37 +218,37 @@ func (e Encodings) FromCSV(L *lua.LState) int {
 		header = uniqueHeader(header)
 	}
 
-	L.Push(L.NewFunction(func(L *lua.LState) int {
+	L.PushFunction(func(L *lua.State) int {
 		e.env.Yield()
 
 		xs, err := c.Read()
 		if err == io.EOF {
-			L.Push(lua.LNil)
-			return 1
+			return 0
 		}
 		HandleError(L, err)
 
-		tbl := L.NewTable()
 		if useHeader {
+			L.CreateTable(0, len(header))
 			for i, val := range xs {
-				L.SetField(tbl, header[i], lua.LString(val))
+				L.SetString(-1, header[i], val)
 			}
 		} else {
-			for _, val := range xs {
-				tbl.Append(lua.LString(val))
+			L.CreateTable(len(xs), 0)
+			for i, val := range xs {
+				L.PushString(val)
+				L.SetI(-2, i+1)
 			}
 		}
-		L.Push(tbl)
 
 		return 1
-	}))
+	})
 
 	if useHeader {
-		lheader := L.NewTable()
-		for _, h := range header {
-			lheader.Append(lua.LString(h))
+		L.CreateTable(0, len(header))
+		for i, h := range header {
+			L.PushString(h)
+			L.SetI(-2, i+1)
 		}
-		L.Push(lheader)
 
 		return 2
 	} else {
@@ -339,143 +256,150 @@ func (e Encodings) FromCSV(L *lua.LState) int {
 	}
 }
 
-func encodeXML(enc *xml.Encoder, t *lua.LTable) {
-	k, v := t.Next(lua.LNil)
-	kn, kok := k.(lua.LNumber)
-	vs, vok := v.(lua.LString)
-	if !kok || kn != 1 || !vok || vs == "" {
+func encodeXML(L *lua.State, index int, enc *xml.Encoder) {
+	L.GetI(index, 1)
+	tag := L.ToString(index)
+	if tag == "" {
 		panic(errors.New("the first element of table should be a string."))
 	}
 
-	start := xml.StartElement{Name: xml.Name{Local: string(vs)}}
-	end := xml.EndElement{Name: xml.Name{Local: string(vs)}}
-
-	var children []lua.LValue
-	for {
-		k, v = t.Next(k)
-		if v.Type() == lua.LTNil {
-			break
-		}
-		if _, ok := k.(lua.LNumber); ok {
-			children = append(children, v)
-		} else {
-			start.Attr = append(start.Attr, xml.Attr{
-				Name:  xml.Name{Local: lua.LVAsString(k)},
-				Value: lua.LVAsString(v),
-			})
-		}
-	}
+	start := xml.StartElement{Name: xml.Name{Local: string(tag)}}
+	end := xml.EndElement{Name: xml.Name{Local: string(tag)}}
 
 	encode := func(t xml.Token) {
-		err := enc.EncodeToken(t)
-		if err != nil {
+		if err := enc.EncodeToken(t); err != nil {
 			panic(err)
 		}
 	}
 
+	L.PushInteger(1)
+	for L.Next(index) {
+		if !L.IsInteger(-2) {
+			L.PushNil()
+			L.Copy(-3, -1)
+			key := L.ToString(-1)
+			L.Pop(1)
+
+			start.Attr = append(start.Attr, xml.Attr{
+				Name:  xml.Name{Local: key},
+				Value: L.ToString(-1),
+			})
+		}
+		L.Pop(1)
+	}
+
 	encode(start)
 
-	for _, child := range children {
-		switch v := child.(type) {
-		case *lua.LNilType:
-		case *lua.LTable:
-			encodeXML(enc, v)
-		case lua.LString:
-			encode(xml.CharData(v))
+	l := int(L.Len(index))
+	for i := 1; i <= l; i++ {
+		L.GetI(index, i)
+		switch L.Type(-1) {
+		case lua.Nil:
+		case lua.Table:
+			encodeXML(L, L.GetTop(), enc)
 		default:
-			encode(xml.CharData(LValueToString(v)))
+			encode(xml.CharData(L.ToString(-1)))
 		}
+		L.Pop(1)
 	}
 
 	encode(end)
 }
 
-func (e Encodings) ToXML(L *lua.LState) int {
+func (e Encodings) ToXML(L *lua.State) int {
+	e.env.Yield()
+
 	defer func() {
 		err := recover()
-		if err != nil {
-			L.RaiseError("%s", err)
+		if e, ok := err.(error); ok {
+			L.Error(1, e)
+		} else if err != nil {
+			L.Errorf(1, "%s", err)
 		}
 	}()
 
-	v := L.CheckTable(1)
+	L.AssertType(1, lua.Table)
 
 	var b strings.Builder
 
-	AsyncRun(e.env, L, func() (struct{}, error) {
-		enc := xml.NewEncoder(&b)
+	enc := xml.NewEncoder(&b)
 
-		encodeXML(enc, v)
+	encodeXML(L, 1, enc)
 
-		return struct{}{}, enc.Flush()
-	})
+	HandleError(L, enc.Flush())
 
-	L.Push(lua.LString(b.String()))
+	L.PushString(b.String())
 	return 1
 }
 
-func decodeXML(dec *xml.Decoder, start xml.StartElement, L *lua.LState) *lua.LTable {
-	tbl := L.NewTable()
+func decodeXML(L *lua.State, dec *xml.Decoder, start xml.StartElement) {
+	L.CreateTable(0, 0)
+	table := L.AbsIndex(-1)
 
-	tbl.Append(lua.LString(start.Name.Local))
+	L.PushString(start.Name.Local)
+	L.SetI(table, 1)
 
 	for _, attr := range start.Attr {
-		L.SetField(tbl, attr.Name.Local, lua.LString(attr.Value))
+		L.SetString(-1, attr.Name.Local, attr.Value)
 	}
 
+	index := 2
 	for {
 		tok, err := dec.Token()
 		if err == io.EOF {
-			return tbl
+			return
 		} else if err != nil {
-			L.RaiseError("%s", err)
+			L.Error(1, err)
 		}
 
 		switch t := tok.(type) {
 		case xml.StartElement:
-			tbl.Append(decodeXML(dec, t, L))
+			decodeXML(L, dec, t)
+			L.SetI(table, index)
+			index++
 		case xml.EndElement:
-			return tbl
+			return
 		case xml.CharData:
 			s := strings.TrimSpace(string(t))
 			if s != "" {
-				tbl.Append(lua.LString(s))
+				L.PushString(s)
+				L.SetI(table, index)
+				index++
 			}
 		}
 	}
 }
 
-func (e Encodings) FromXML(L *lua.LState) int {
-	e.env.Yield()
+func (e Encodings) FromXML(L *lua.State) int {
+	dec := xml.NewDecoder(strings.NewReader(L.CheckString(1)))
 
-	r := checkReader(L, 1)
-	dec := xml.NewDecoder(r)
+	for i := 0; ; i++ {
+		e.env.Yield()
 
-	for {
 		tok, err := dec.Token()
 		if err == io.EOF {
-			L.Push(lua.LNil)
-			return 1
+			return i
 		}
 		HandleError(L, err)
 
 		if start, ok := tok.(xml.StartElement); ok {
-			tbl := decodeXML(dec, start, L)
-			L.Push(tbl)
-			break
+			decodeXML(L, dec, start)
 		}
 	}
-
-	return 1
 }
 
-func RegisterEncodings(env *Environment) {
-	env.RegisterFunction("tojson", Encodings{env}.ToJSON)
-	env.RegisterFunction("fromjson", Encodings{env}.FromJSON)
+func RegisterEncodings(env *Environment, L *lua.State) {
+	register := func(name string, f lua.GFunction) {
+		L.PushFunction(f)
+		L.SetGlobal(name)
+	}
 
-	env.RegisterFunction("tocsv", Encodings{env}.ToCSV)
-	env.RegisterFunction("fromcsv", Encodings{env}.FromCSV)
+	register("tojson", Encodings{env}.ToJSON)
+	register("fromjson", Encodings{env}.FromJSON)
 
-	env.RegisterFunction("toxml", Encodings{env}.ToXML)
-	env.RegisterFunction("fromxml", Encodings{env}.FromXML)
+	register("tocsv", Encodings{env}.ToCSV)
+	register("fromcsv", Encodings{env}.FromCSV)
+
+	register("toxml", Encodings{env}.ToXML)
+	register("fromxml", Encodings{env}.FromXML)
 }

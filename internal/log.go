@@ -10,8 +10,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/macrat/ayd-web-scenario/internal/lua"
 	"github.com/macrat/ayd/lib-ayd"
-	"github.com/yuin/gopher-lua"
 )
 
 type Logger struct {
@@ -26,45 +26,28 @@ type Logger struct {
 	Extra      map[string]any
 }
 
-func (l *Logger) Print(values ...lua.LValue) {
+func (l *Logger) Print(L *lua.State) {
 	l.Lock()
 	defer l.Unlock()
 
-	switch len(values) {
-	case 0:
+	if L.GetTop() == 1 {
 		l.Logs = append(l.Logs, "")
-	case 1:
-		if s, ok := values[0].(lua.LString); ok {
-			l.Logs = append(l.Logs, string(s))
-		} else {
-			x, _ := json.Marshal(UnpackLValue(values[0]))
-			l.Logs = append(l.Logs, string(x))
+	} else {
+		var ss []string
+		for i := 2; i <= L.GetTop(); i++ {
+			ss = append(ss, L.ToString(i))
 		}
-	default:
-		var xs []any
-		for _, v := range values {
-			xs = append(xs, UnpackLValue(v))
-		}
-		x, _ := json.Marshal(xs)
-		l.Logs = append(l.Logs, string(x))
+		l.Logs = append(l.Logs, strings.Join(ss, "\t"))
 	}
 
 	if l.Stream != nil {
-		var ss []string
-		for _, v := range values {
-			if s, ok := v.(lua.LString); ok {
-				ss = append(ss, string(s))
-			} else {
-				ss = append(ss, LValueToString(v))
-			}
-		}
-		fmt.Fprintln(l.Stream, strings.Join(ss, "\t"))
+		fmt.Fprintln(l.Stream, l.Logs[len(l.Logs)-1])
 	}
 }
 
-func (l *Logger) StartTask(where, name string) {
+func (l *Logger) StartTask(where string, line int, name string) {
 	if l.Stream != nil && l.Debug {
-		fmt.Fprintln(l.Stream, where, name)
+		fmt.Fprintf(l.Stream, "%s:%d: %s", where, line, name)
 	}
 }
 
@@ -89,7 +72,7 @@ func (l *Logger) HandleError(ctx context.Context, err error) {
 	l.Logs = append(l.Logs, strings.TrimRight(msg, "\n"))
 
 	if l.Stream != nil {
-		fmt.Fprint(l.Stream, msg)
+		fmt.Fprintln(l.Stream, msg)
 	}
 }
 
@@ -164,47 +147,49 @@ func (l *Logger) SetExtra(k string, v any) {
 	}
 }
 
-func RegisterLogger(L *lua.LState, logger *Logger) {
-	tbl := L.SetFuncs(L.NewTable(), map[string]lua.LGFunction{
-		"status": func(L *lua.LState) int {
+func RegisterLogger(L *lua.State, logger *Logger) {
+	L.CreateTable(0, 3)
+
+	L.SetFuncs(-1, map[string]lua.GFunction{
+		"status": func(L *lua.State) int {
 			logger.SetStatus(strings.ToUpper(L.CheckString(1)))
 			return 0
 		},
-		"latency": func(L *lua.LState) int {
-			if L.Get(1).Type() == lua.LTNil {
+		"latency": func(L *lua.State) int {
+			if L.Type(1) == lua.Nil {
 				logger.UnsetLatency()
 			} else {
 				logger.SetLatency(float64(L.CheckNumber(1)))
 			}
 			return 0
 		},
-		"extra": func(L *lua.LState) int {
+		"extra": func(L *lua.State) int {
 			key := L.CheckString(1)
 			switch strings.ToLower(key) {
 			case "message":
-				L.RaiseError("print.extra() can not set message. please use print().")
+				L.Errorf(1, "bad argument #1: print.extra() can not set message. please use print().")
 			case "status":
-				L.RaiseError("print.extra() can not set status. please use print.status().")
+				L.Errorf(1, "bad argument #1: print.extra() can not set status. please use print.status().")
 			case "latency":
-				L.RaiseError("print.extra() can not set latency. please use print.latency().")
+				L.Errorf(1, "bad argument #1: print.extra() can not set latency. please use print.latency().")
 			case "time", "target":
-				L.RaiseError("print.extra() can not set %s.", key)
+				L.Errorf(1, "bad argument #1: print.extra() can not set %s.", key)
 			default:
-				value := UnpackLValue(L.CheckAny(2))
+				value := L.ToAny(2)
 				logger.SetExtra(key, value)
 			}
 			return 0
 		},
 	})
-	L.SetMetatable(tbl, L.SetFuncs(L.NewTable(), map[string]lua.LGFunction{
-		"__call": func(L *lua.LState) int {
-			var xs []lua.LValue
-			for i := 2; i <= L.GetTop(); i++ {
-				xs = append(xs, L.Get(i))
-			}
-			logger.Print(xs...)
+
+	L.CreateTable(0, 1)
+	L.SetFuncs(-1, map[string]lua.GFunction{
+		"__call": func(L *lua.State) int {
+			logger.Print(L)
 			return 0
 		},
-	}))
-	L.SetGlobal("print", tbl)
+	})
+	L.SetMetatable(-2)
+
+	L.SetGlobal("print")
 }

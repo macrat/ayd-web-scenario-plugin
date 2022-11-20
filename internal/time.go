@@ -5,17 +5,18 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/yuin/gopher-lua"
+	"github.com/macrat/ayd-web-scenario/internal/lua"
 )
 
-func RegisterTime(ctx context.Context, env *Environment) {
-	env.RegisterNewType("time", map[string]lua.LGFunction{
-		"now": func(L *lua.LState) int {
+func RegisterTime(ctx context.Context, env *Environment, L *lua.State) {
+	L.CreateTable(0, 0)
+	L.SetFuncs(-1, map[string]lua.GFunction{
+		"now": func(L *lua.State) int {
 			env.Yield()
-			L.Push(lua.LNumber(time.Now().UnixMilli()))
+			L.PushInteger(time.Now().UnixMilli())
 			return 1
 		},
-		"sleep": func(L *lua.LState) int {
+		"sleep": func(L *lua.State) int {
 			n := float64(L.CheckNumber(1))
 			env.RecordOnAllTabs(L, fmt.Sprintf("time.sleep(%f)", n))
 
@@ -36,25 +37,31 @@ func RegisterTime(ctx context.Context, env *Environment) {
 			env.RecordOnAllTabs(L, fmt.Sprintf("time.sleep(%f)", n))
 			return 0
 		},
-		"format": func(L *lua.LState) int {
+		"format": func(L *lua.State) int {
 			env.Yield()
 
 			n := L.CheckNumber(1)
-			format := L.OptString(2, "%Y-%m-%dT%H:%M:%S%z")
+			format := "%Y-%m-%dT%H:%M:%S%z"
+			if L.Type(2) != lua.Nil {
+				L.ToString(2)
+			}
 
-			L.Push(L.GetField(L.GetGlobal("os"), "date"))
-			L.Push(lua.LString(format))
-			L.Push(lua.LNumber(n / 1000))
-			L.Call(2, 1)
+			L.GetGlobal("os")
+			L.GetField(-1, "date")
+			L.PushString(format)
+			L.PushNumber(n / 1000)
+			if err := L.Call(2, 1); err != nil {
+				L.Error(1, err)
+			}
 			return 1
 		},
-	}, map[string]lua.LValue{
-		"millisecond": lua.LNumber(1),
-		"second":      lua.LNumber(1000),
-		"minute":      lua.LNumber(1000 * 60),
-		"hour":        lua.LNumber(1000 * 60 * 60),
-		"day":         lua.LNumber(1000 * 60 * 60 * 24),
-		"week":        lua.LNumber(1000 * 60 * 60 * 24 * 7),
-		"year":        lua.LNumber(1000 * 60 * 60 * 24 * 7 * 365),
 	})
+	L.SetInteger(-1, "millisecond", 1)
+	L.SetInteger(-1, "second", 1000)
+	L.SetInteger(-1, "minute", 1000*60)
+	L.SetInteger(-1, "hour", 1000*60*60)
+	L.SetInteger(-1, "day", 1000*60*60*24)
+	L.SetInteger(-1, "week", 1000*60*60*24*7)
+	L.SetInteger(-1, "year", 1000*60*60*24*7*365)
+	L.SetGlobal("time")
 }

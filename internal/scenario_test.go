@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/macrat/ayd-web-scenario/internal/lua"
 	"github.com/macrat/ayd/lib-ayd"
-	"github.com/yuin/gopher-lua"
 )
 
 func init() {
@@ -166,18 +166,27 @@ func StartTestServer() *httptest.Server {
 	return httptest.NewServer(mux)
 }
 
-func RegisterTestUtil(L *lua.LState, storage *Storage, server *httptest.Server) {
-	tbl := L.SetFuncs(L.NewTable(), map[string]lua.LGFunction{
-		"url": func(L *lua.LState) int {
-			L.Push(lua.LString(server.URL + L.OptString(1, "")))
+func RegisterTestUtil(L *lua.State, storage *Storage, server *httptest.Server) {
+	L.CreateTable(0, 2)
+	L.SetFuncs(-1, map[string]lua.GFunction{
+		"url": func(L *lua.State) int {
+			if L.Type(1) == lua.String {
+				L.PushString(server.URL + L.ToString(1))
+			} else {
+				L.PushString(server.URL)
+			}
 			return 1
 		},
-		"storage": func(L *lua.LState) int {
-			L.Push(lua.LString(filepath.Join(storage.Dir, L.OptString(1, ""))))
+		"storage": func(L *lua.State) int {
+			if L.Type(1) == lua.String {
+				L.PushString(filepath.Join(storage.Dir, L.ToString(1)))
+			} else {
+				L.PushString(storage.Dir)
+			}
 			return 1
 		},
 	})
-	L.SetGlobal("TEST", tbl)
+	L.SetGlobal("TEST")
 }
 
 type DebugWriter testing.T
@@ -218,7 +227,10 @@ func Test_testSenarios(t *testing.T) {
 			}
 
 			logger := &Logger{Stream: (*DebugWriter)(t)}
-			env := NewEnvironment(ctx, logger, s, Arg{Mode: "ayd", Args: []string{"abc", "def"}, Target: target})
+			env, err := NewEnvironment(ctx, logger, s, Arg{Mode: "ayd", Args: []string{"abc", "def"}, Target: target})
+			if err != nil {
+				t.Fatalf("failed to prepare environment: %s", err)
+			}
 			defer env.Close()
 
 			RegisterTestUtil(env.lua, s, server)
@@ -247,7 +259,10 @@ func Test_errorInEvent(t *testing.T) {
 	}
 
 	logger := &Logger{Stream: (*DebugWriter)(t)}
-	env := NewEnvironment(ctx, logger, s, Arg{Mode: "ayd", Args: []string{"abc", "def"}, Target: target})
+	env, err := NewEnvironment(ctx, logger, s, Arg{Mode: "ayd", Args: []string{"abc", "def"}, Target: target})
+	if err != nil {
+		t.Fatalf("failed to prepare environment: %s", err)
+	}
 	defer env.Close()
 
 	RegisterTestUtil(env.lua, s, server)

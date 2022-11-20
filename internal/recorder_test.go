@@ -26,27 +26,6 @@ func LoadGif(t testing.TB, name string) *image.Paletted {
 	return img.(*image.Paletted)
 }
 
-func Test_parseWhere(t *testing.T) {
-	tests := []struct {
-		Where string
-		Path  string
-		Line  int
-	}{
-		{"/path/to/file.lua:123:", "/path/to/file.lua", 123},
-		{"./file.lua:5:", "./file.lua", 5},
-	}
-
-	for _, tt := range tests {
-		p, l := parseWhere(tt.Where)
-		if p != tt.Path {
-			t.Errorf("%s expected path %q but got %q", tt.Where, tt.Path, p)
-		}
-		if l != tt.Line {
-			t.Errorf("%s expected line %d but got %d", tt.Where, tt.Line, l)
-		}
-	}
-}
-
 func Test_compressGif(t *testing.T) {
 	t.Parallel()
 

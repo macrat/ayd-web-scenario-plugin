@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/yuin/gopher-lua"
+	"github.com/macrat/ayd-web-scenario/internal/lua"
 )
 
 func TestUnpackFetchHeader(t *testing.T) {
@@ -42,19 +42,26 @@ func TestUnpackFetchHeader(t *testing.T) {
 		},
 	}
 
-	L := lua.NewState()
+	L, err := lua.NewState()
+	if err != nil {
+		t.Fatalf("failed to prepare lua: %s", err)
+	}
 	defer L.Close()
 
 	for _, tt := range tests {
-		if err := L.DoString("return " + tt.Input); err != nil {
+		if err := L.LoadString("return " + tt.Input); err != nil {
 			t.Errorf("failed to prepare test input: %s\n%s", err, tt.Input)
 			continue
 		}
 
-		v := L.Get(1)
-		L.Pop(1)
+		err := L.Call(0, 1)
+		if err != nil {
+			t.Errorf("failed to call test script: %s\n%s", err, tt.Input)
+			continue
+		}
 
-		actual, err := UnpackFetchHeader(L, v)
+		actual, err := ToFetchHeader(L, -1)
+		L.Pop(1)
 		if err != nil {
 			t.Errorf("unexpected error: %s\n%s", err, tt.Input)
 			continue

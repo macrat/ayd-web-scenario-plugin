@@ -4,9 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"sync"
 
-	"github.com/yuin/gopher-lua"
+	"github.com/macrat/ayd-web-scenario/internal/lua"
 )
 
 var (
@@ -17,7 +18,7 @@ var (
 type Environment struct {
 	sync.Mutex // this mutex works like the GIL in Python.
 
-	lua     *lua.LState
+	lua     *lua.State
 	ctx     context.Context
 	stop    context.CancelFunc
 	tabs    []*Tab
@@ -29,15 +30,16 @@ type Environment struct {
 	EnableRecording bool
 }
 
-func NewEnvironment(ctx context.Context, logger *Logger, s *Storage, arg Arg) *Environment {
-	L := lua.NewState()
-	ctx, stop := context.WithCancel(ctx)
-	L.SetContext(ctx)
+func NewEnvironment(ctx context.Context, logger *Logger, s *Storage, arg Arg) (*Environment, error) {
+	L, err := lua.NewState()
+	if err != nil {
+		return nil, err
+	}
 
 	env := &Environment{
 		lua:     L,
 		ctx:     ctx,
-		stop:    stop,
+		stop:    func() {},
 		logger:  logger,
 		storage: s,
 		errch:   make(chan error, 1),
@@ -46,17 +48,17 @@ func NewEnvironment(ctx context.Context, logger *Logger, s *Storage, arg Arg) *E
 
 	RegisterLogger(L, logger)
 	RegisterElementType(ctx, L)
-	RegisterTabType(ctx, env)
-	RegisterTime(ctx, env)
+	RegisterTabType(ctx, env, L)
+	RegisterTime(ctx, env, L)
 	RegisterAssert(L)
 	RegisterKey(L)
 	RegisterFileLike(L)
-	RegisterEncodings(env)
-	RegisterFetch(ctx, env)
-	s.Register(env)
+	RegisterEncodings(env, L)
+	RegisterFetch(ctx, env, L)
+	s.Register(env, L)
 	arg.Register(L)
 
-	return env
+	return env, nil
 }
 
 func (env *Environment) Close() error {
@@ -71,39 +73,44 @@ func (env *Environment) Close() error {
 	return nil
 }
 
-func HandleError(L *lua.LState, err error) {
+func HandleError(L *lua.State, err error) {
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) {
-			L.RaiseError("timeout")
+			L.Errorf(1, "timeout")
 		} else if errors.Is(err, context.Canceled) {
-			L.RaiseError("interrupted")
+			L.Errorf(1, "interrupted")
 		} else {
-			L.RaiseError("%s", err)
+			L.Error(1, err)
 		}
 	}
 }
 
 func (env *Environment) DoFile(path string) error {
+	f, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+
+	ctx, stop := context.WithCancel(env.ctx)
+	env.stop = stop
+
 	done := make(chan struct{})
 
 	go func() {
-		err := env.lua.DoFile(path)
+		err := env.lua.DoWithContext(ctx, f, path, true)
 		if err != nil {
 			env.errch <- err
 		}
 		close(done)
 	}()
 
-	var err error
 	select {
 	case <-done:
 	case err = <-env.errch:
 		env.stop()
 		<-done
-		ctx, stop := context.WithCancel(env.ctx)
-		env.lua.SetContext(ctx)
-		env.stop = stop
 	}
+	env.stop = func() {}
 	return err
 }
 
@@ -114,7 +121,7 @@ func (env *Environment) Yield() {
 }
 
 // AsyncRun makes a chance to execute callback function while executing a heavy function.
-func AsyncRun[T any](env *Environment, L *lua.LState, f func() (T, error)) T {
+func AsyncRun[T any](env *Environment, L *lua.State, f func() (T, error)) T {
 	env.Unlock()
 	defer env.Lock()
 	x, err := f()
@@ -122,6 +129,7 @@ func AsyncRun[T any](env *Environment, L *lua.LState, f func() (T, error)) T {
 	return x
 }
 
+/*
 // CallEventHandler calls an event callback function with GIL.
 func (env *Environment) CallEventHandler(f *lua.LFunction, arg *lua.LTable, nret int) []lua.LValue {
 	env.Lock()
@@ -140,48 +148,18 @@ func (env *Environment) CallEventHandler(f *lua.LFunction, arg *lua.LTable, nret
 	}
 	return result
 }
+*/
 
-func (env *Environment) StartTask(where, taskName string) {
-	env.logger.StartTask(where, taskName)
+func (env *Environment) StartTask(where string, line int, taskName string) {
+	env.logger.StartTask(where, line, taskName)
 }
 
-func (env *Environment) BuildTable(build func(L *lua.LState, tbl *lua.LTable)) *lua.LTable {
-	env.Lock()
+func (env *Environment) BuildTable(build func(L *lua.State)) {
+	env.Lock() // XXX: why is it lock here? it's weird
 	defer env.Unlock()
-	tbl := env.lua.NewTable()
-	build(env.lua, tbl)
-	return tbl
-}
 
-func (env *Environment) NewFunction(f lua.LGFunction) *lua.LFunction {
-	return env.lua.NewFunction(f)
-}
-
-func (env *Environment) RegisterFunction(name string, f lua.LGFunction) {
-	env.lua.SetGlobal(name, env.NewFunction(f))
-}
-
-func (env *Environment) RegisterTable(name string, fields, meta map[string]lua.LValue) {
-	tbl := env.lua.NewTable()
-	for k, v := range fields {
-		env.lua.SetField(tbl, k, v)
-	}
-	if meta != nil {
-		m := env.lua.NewTable()
-		for k, v := range meta {
-			env.lua.SetField(m, k, v)
-		}
-		env.lua.SetMetatable(tbl, m)
-	}
-	env.lua.SetGlobal(name, tbl)
-}
-
-func (env *Environment) RegisterNewType(name string, methods map[string]lua.LGFunction, fields map[string]lua.LValue) {
-	tbl := env.lua.SetFuncs(env.lua.NewTypeMetatable(name), methods)
-	for k, v := range fields {
-		env.lua.SetField(tbl, k, v)
-	}
-	env.lua.SetGlobal(name, tbl)
+	env.lua.CreateTable(0, 0)
+	build(env.lua)
 }
 
 func (env *Environment) saveRecord(id int, recorder *Recorder) {
@@ -213,7 +191,7 @@ func (env *Environment) unregisterTab(t *Tab) {
 	env.tabs = tabs
 }
 
-func (env *Environment) RecordOnAllTabs(L *lua.LState, taskName string) {
+func (env *Environment) RecordOnAllTabs(L *lua.State, taskName string) {
 	for _, tab := range env.tabs {
 		tab.RecordOnce(L, taskName)
 	}

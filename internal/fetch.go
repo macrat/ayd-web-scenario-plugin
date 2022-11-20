@@ -3,7 +3,6 @@ package webscenario
 import (
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -12,66 +11,72 @@ import (
 	"strings"
 	"time"
 
-	"github.com/yuin/gopher-lua"
+	"github.com/macrat/ayd-web-scenario/internal/lua"
 )
 
-func UnpackFetchHeader(L *lua.LState, lv lua.LValue) (http.Header, error) {
-	if lv.Type() == lua.LTNil {
-		return http.Header{}, nil
-	}
+func ToFetchHeader(L *lua.State, index int) (http.Header, error) {
+	TABLE := L.AbsIndex(index)
+	KEY := TABLE + 1
+	VALUE := TABLE + 2
 
-	t, ok := lv.(*lua.LTable)
-	if !ok {
-		return http.Header{}, errors.New("header field is expected be a table.")
+	switch L.Type(TABLE) {
+	case lua.Table:
+	case lua.Nil:
+		return http.Header{}, nil
+	default:
+		return http.Header{}, fmt.Errorf("header field is expected table, got %s", L.Type(-1))
 	}
 
 	h := http.Header{}
 
-	t.ForEach(func(k, v lua.LValue) {
-		key, ok := k.(lua.LString)
-		if !ok {
-			return
-		}
+	L.PushNil()
+	for L.Next(TABLE) {
+		if L.Type(KEY) == lua.String {
+			key := L.ToString(KEY)
 
-		switch v := v.(type) {
-		case *lua.LTable:
-			ipairs(v, func(_, v lua.LValue) {
-				h.Add(string(key), string(L.ToStringMeta(v).(lua.LString)))
-			})
-		case lua.LString:
-			h.Set(string(key), string(v))
-		default:
-			h.Set(string(key), string(L.ToStringMeta(v).(lua.LString)))
+			switch L.Type(VALUE) {
+			case lua.Table:
+				l := int(L.Len(VALUE))
+				for i := 1; i <= l; i++ {
+					L.GetI(VALUE, i)
+					h.Add(key, L.ToString(-1))
+					L.Pop(1)
+				}
+			default:
+				h.Set(key, L.ToString(VALUE))
+			}
 		}
-	})
+		L.Pop(1)
+	}
 
 	return h, nil
 }
 
-func PackFetchHeader(L *lua.LState, h http.Header) lua.LValue {
-	tbl := L.NewTable()
+func PushFetchHeader(L *lua.State, h http.Header) {
+	L.CreateTable(0, len(h))
+	TABLE := L.GetTop()
 
 	for k, vs := range h {
-		vt := L.NewTable()
-		for _, v := range vs {
-			vt.Append(lua.LString(v))
+		L.CreateTable(len(vs), 0)
+		for i, v := range vs {
+			L.PushString(v)
+			L.SetI(-2, i+1)
 		}
-		L.SetField(tbl, k, vt)
+		L.SetField(TABLE, k)
 	}
-
-	return tbl
 }
 
-func PackFetchResponse(env *Environment, L *lua.LState, resp *http.Response, body io.Reader) lua.LValue {
-	tbl := L.NewTable()
-	L.SetMetatable(tbl, AsFileLikeMeta(L, body))
+func PushFetchResponse(env *Environment, L *lua.State, resp *http.Response, body io.Reader) {
+	L.CreateTable(0, 4)
 
-	L.SetField(tbl, "url", lua.LString(resp.Request.URL.String()))
-	L.SetField(tbl, "status", lua.LNumber(resp.StatusCode))
-	L.SetField(tbl, "headers", PackFetchHeader(L, resp.Header))
-	L.SetField(tbl, "length", lua.LNumber(resp.ContentLength))
+	PushFileLikeMeta(L, body)
+	L.SetMetatable(-2)
 
-	return tbl
+	L.SetString(-1, "url", resp.Request.URL.String())
+	L.SetInteger(-1, "status", int64(resp.StatusCode))
+	PushFetchHeader(L, resp.Header)
+	L.SetField(-2, "headers")
+	L.SetInteger(-1, "length", resp.ContentLength)
 }
 
 type CookieJar struct {
@@ -89,15 +94,15 @@ func NewCookieJar(id int) (*CookieJar, error) {
 	}, err
 }
 
-func CheckCookieJar(L *lua.LState, n int) *CookieJar {
-	ud := L.ToUserData(n)
+func CheckCookieJar(L *lua.State, n int) *CookieJar {
+	ud := L.ToUserdata(n)
 	if ud == nil {
-		L.ArgError(n, "cookiejar expected.")
+		L.ArgErrorf(n, "cookiejar expected, got %s", L.Type(n))
 	}
 
-	j, ok := ud.Value.(*CookieJar)
+	j, ok := ud.(*CookieJar)
 	if !ok {
-		L.ArgError(n, "cookiejar expected.")
+		L.ArgErrorf(n, "cookiejar expected, got %s", L.Type(n))
 	}
 
 	return j
@@ -112,24 +117,26 @@ func (j *CookieJar) Cookies(u *url.URL) []*http.Cookie {
 	return j.jar.Cookies(u)
 }
 
-func (j *CookieJar) CookiesAsLua(L *lua.LState, u *url.URL) (*lua.LTable, bool) {
+func (j *CookieJar) PushCookies(L *lua.State, u *url.URL) (ok bool) {
 	cs := j.Cookies(u)
 	if len(cs) == 0 {
-		return nil, false
+		return false
 	}
 
-	tbl := L.NewTable()
-	for _, c := range cs {
-		l := L.NewTable()
-		L.SetField(l, "name", lua.LString(c.Name))
-		L.SetField(l, "value", lua.LString(c.Value))
-		L.SetField(l, "path", lua.LString(c.Path))
-		L.SetField(l, "domain", lua.LString(c.Domain))
+	L.CreateTable(len(cs), 0)
+
+	for i, c := range cs {
+		L.CreateTable(9, 0)
+
+		L.SetString(-1, "name", c.Name)
+		L.SetString(-1, "value", c.Value)
+		L.SetString(-1, "path", c.Path)
+		L.SetString(-1, "domain", c.Domain)
 		if !c.Expires.IsZero() {
-			L.SetField(l, "expires", lua.LNumber(c.Expires.UnixMilli()))
+			L.SetInteger(-1, "expires", c.Expires.UnixMilli())
 		}
-		L.SetField(l, "secure", lua.LBool(c.Secure))
-		L.SetField(l, "httponly", lua.LBool(c.HttpOnly))
+		L.SetBoolean(-1, "secure", c.Secure)
+		L.SetBoolean(-1, "httponly", c.HttpOnly)
 
 		var samesite string
 		switch c.SameSite {
@@ -142,120 +149,127 @@ func (j *CookieJar) CookiesAsLua(L *lua.LState, u *url.URL) (*lua.LTable, bool) 
 		case http.SameSiteNoneMode:
 			samesite = "none"
 		}
-		L.SetField(l, "samesite", lua.LString(samesite))
+		L.SetString(-1, "samesite", samesite)
 
-		tbl.Append(l)
+		L.SetI(-2, i+1)
 	}
-	return tbl, true
+
+	return true
 }
 
-func (j *CookieJar) ToLua(L *lua.LState) lua.LValue {
-	v := L.NewUserData()
-	v.Value = j
-	v.Metatable = L.SetFuncs(L.NewTable(), map[string]lua.LGFunction{
-		"__tostring": func(L *lua.LState) int {
-			L.Push(lua.LString(fmt.Sprintf("cookiejar#%d", j.id)))
-			return 1
-		},
-	})
-	L.SetField(v.Metatable, "__index", L.SetFuncs(L.NewTable(), map[string]lua.LGFunction{
-		"all": func(L *lua.LState) int {
+func (j *CookieJar) PushTo(L *lua.State) {
+	L.PushUserdata(j)
+
+	L.CreateTable(0, 1)
+	L.PushString(fmt.Sprintf("cookiejar#%d", j.id))
+	L.SetField(-2, "__name")
+
+	L.CreateTable(0, 2)
+	L.SetFuncs(-1, map[string]lua.GFunction{
+		"all": func(L *lua.State) int {
 			j := CheckCookieJar(L, 1)
 
-			tbl := L.NewTable()
+			L.CreateTable(0, len(j.urls))
 			for s, u := range j.urls {
-				if cs, ok := j.CookiesAsLua(L, u); ok {
-					L.SetField(tbl, s, cs)
+				if ok := j.PushCookies(L, u); ok {
+					L.SetField(-2, s)
 				}
 			}
-			L.Push(tbl)
 
 			return 1
 		},
-		"get": func(L *lua.LState) int {
+		"get": func(L *lua.State) int {
 			j := CheckCookieJar(L, 1)
 
 			u, err := url.Parse(L.ToString(2))
 			if err != nil {
-				L.ArgError(2, "valid url expected.")
+				L.ArgErrorf(2, "valid url expected, got %q (%s)", L.ToString(2), L.Type(2))
 			}
 
-			cs, _ := j.CookiesAsLua(L, u)
-			L.Push(cs)
-
-			return 1
+			if ok := j.PushCookies(L, u); ok {
+				return 1
+			} else {
+				return 0
+			}
 		},
-	}))
-	return v
+	})
+	L.SetField(-2, "__index")
+
+	L.SetMetatable(-2)
 }
 
-func RegisterFetch(ctx context.Context, env *Environment) {
+func RegisterFetch(ctx context.Context, env *Environment, L *lua.State) {
 	jarID := 1
 
-	env.RegisterFunction("fetch", func(L *lua.LState) int {
-		url := L.CheckString(1)
-		opts := L.OptTable(2, L.NewTable())
+	L.PushFunction(func(L *lua.State) int {
+		u := L.CheckString(1)
 
-		header, err := UnpackFetchHeader(L, L.GetField(opts, "headers"))
-		if err != nil {
-			L.ArgError(2, err.Error())
-		}
-
+		var header http.Header
 		var body io.Reader
-		switch b := L.GetField(opts, "body").(type) {
-		case *lua.LNilType:
-		case lua.LString:
-			body = strings.NewReader(string(b))
-		case lua.LNumber:
-			body = strings.NewReader(string(b.String()))
-		case *lua.LFunction:
-			body = newReaderFromLFunction(L, b)
-		default:
-			L.ArgError(2, "body field expected be a string.")
-		}
-
-		method := ""
-		switch m := L.GetField(opts, "method").(type) {
-		case *lua.LNilType:
-		case lua.LString:
-			method = string(m)
-		default:
-			L.ArgError(2, "method field expected be a string.")
-		}
-		if method == "" {
-			if body != nil {
-				method = "POST"
-			} else {
-				method = "GET"
-			}
-		}
-
+		var method string
 		timeout := time.Duration(5 * time.Minute)
-		switch t := L.GetField(opts, "timeout").(type) {
-		case *lua.LNilType:
-		case lua.LNumber:
-			timeout = time.Duration(float64(t) * float64(time.Millisecond))
-		default:
-			L.ArgError(2, "timeout field expected be a string.")
+		var cookiejar *CookieJar
+
+		if optType := L.Type(2); optType != lua.Nil {
+			if optType != lua.Table {
+				L.ArgErrorf(2, "table or nil expected, got %s", optType)
+			}
+
+			var err error
+			L.GetField(2, "headers")
+			header, err = ToFetchHeader(L, -1)
+			if err != nil {
+				L.ArgErrorf(2, "%s", err)
+			}
+			L.Pop(1)
+
+			if L.GetField(2, "body") != lua.Nil {
+				body = strings.NewReader(L.ToString(3))
+			}
+			L.Pop(1)
+
+			if L.GetField(2, "method") != lua.Nil {
+				method = L.ToString(3)
+			}
+			L.Pop(1)
+
+			if typ := L.GetField(2, "timeout"); typ == lua.Number {
+				timeout = time.Duration(L.ToNumber(3) * float64(time.Millisecond))
+			} else {
+				L.ArgErrorf(2, "timeout field expected string, got %s", typ)
+			}
+			L.Pop(1)
+
+			switch L.GetField(2, "cookiejar") {
+			case lua.Nil:
+				var err error
+				cookiejar, err = NewCookieJar(jarID)
+				if err != nil {
+					L.Errorf(1, "failed to prepare cookiejar: %w", err)
+				}
+				jarID++
+			case lua.Userdata:
+				if j, ok := L.ToUserdata(3).(*CookieJar); ok {
+					cookiejar = j
+					break
+				}
+				L.ArgErrorf(2, "cookiejar field is invalid")
+			default:
+				L.ArgErrorf(2, "cookiejar field is invalid, got %s", L.Type(3))
+			}
+			L.Pop(1)
 		}
 
-		var cookiejar *CookieJar
-		switch s := L.GetField(opts, "cookiejar").(type) {
-		case *lua.LNilType:
-			var err error
-			cookiejar, err = NewCookieJar(jarID)
-			if err != nil {
-				L.RaiseError("failed to prepare session: %s", err)
+		switch method {
+		case http.MethodGet, http.MethodHead, http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete, http.MethodConnect, http.MethodOptions, http.MethodTrace:
+		case "":
+			if body != nil {
+				method = http.MethodPost
+			} else {
+				method = http.MethodGet
 			}
-			jarID++
-		case *lua.LUserData:
-			if j, ok := s.Value.(*CookieJar); ok {
-				cookiejar = j
-				break
-			}
-			L.ArgError(2, "session field expected session value.")
 		default:
-			L.ArgError(2, "session field expected session value.")
+			L.ArgErrorf(2, "method field is invalid, got %q", method)
 		}
 
 		type Ret struct {
@@ -270,7 +284,7 @@ func RegisterFetch(ctx context.Context, env *Environment) {
 				defer cancel()
 			}
 
-			req, err := http.NewRequestWithContext(c, method, url, body)
+			req, err := http.NewRequestWithContext(c, method, u, body)
 			if err != nil {
 				return Ret{nil, nil}, err
 			}
@@ -287,9 +301,9 @@ func RegisterFetch(ctx context.Context, env *Environment) {
 			return Ret{resp, body}, err
 		})
 
-		L.Push(PackFetchResponse(env, L, ret.Resp, bytes.NewReader(ret.Body)))
-		L.Push(cookiejar.ToLua(L))
-
+		PushFetchResponse(env, L, ret.Resp, bytes.NewReader(ret.Body))
+		cookiejar.PushTo(L)
 		return 2
 	})
+	L.SetGlobal("fetch")
 }

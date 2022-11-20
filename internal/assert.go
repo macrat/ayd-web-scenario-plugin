@@ -1,52 +1,64 @@
 package webscenario
 
 import (
+	"encoding/json"
 	"reflect"
 
-	"github.com/yuin/gopher-lua"
+	"github.com/macrat/ayd-web-scenario/internal/lua"
 )
 
-func RegisterAssert(L *lua.LState) {
-	failed := func(L *lua.LState, operator string, a, b string) {
-		L.RaiseError("assertion failed: %s %s %s", a, operator, b)
+func RegisterAssert(L *lua.State) {
+	failed := func(L *lua.State, operator string) {
+		a, err := json.Marshal(L.ToAny(1))
+		if err != nil {
+			a = []byte(L.ToString(1))
+		}
+
+		b, err := json.Marshal(L.ToAny(2))
+		if err != nil {
+			b = []byte(L.ToString(2))
+		}
+
+		L.Errorf(1, "assertion failed: %s %s %s", a, operator, b)
 	}
 
-	order := func(operator string, s func(a, b string) bool, n func(a, b float64) bool) lua.LGFunction {
-		return func(L *lua.LState) int {
-			a, b := L.Get(1), L.Get(2)
-			if a.Type() != b.Type() {
-				failed(L, operator, LValueToString(a), LValueToString(b))
+	order := func(operator string, s func(a, b string) bool, n func(a, b float64) bool) lua.GFunction {
+		return func(L *lua.State) int {
+			if L.Type(1) != L.Type(2) {
+				failed(L, operator)
 			}
-			switch a.Type() {
-			case lua.LTString:
-				if !s(string(a.(lua.LString)), string(b.(lua.LString))) {
-					failed(L, operator, LValueToString(a), LValueToString(b))
+			switch L.Type(1) {
+			case lua.String:
+				a, b := L.ToString(1), L.ToString(2)
+				if !s(a, b) {
+					failed(L, operator)
 				}
-			case lua.LTNumber:
-				if !n(float64(a.(lua.LNumber)), float64(b.(lua.LNumber))) {
-					failed(L, operator, LValueToString(a), LValueToString(b))
+			case lua.Number:
+				if !n(L.ToNumber(1), L.ToNumber(2)) {
+					failed(L, operator)
 				}
 			default:
-				failed(L, operator, LValueToString(a), LValueToString(b))
+				failed(L, operator)
 			}
 			return 2
 		}
 	}
 
-	tbl := L.SetFuncs(L.NewTable(), map[string]lua.LGFunction{
-		"eq": func(L *lua.LState) int {
-			a := UnpackLValue(L.Get(1))
-			b := UnpackLValue(L.Get(2))
+	L.CreateTable(0, 6)
+	L.SetFuncs(-1, map[string]lua.GFunction{
+		"eq": func(L *lua.State) int {
+			a := L.ToAny(1)
+			b := L.ToAny(2)
 			if !reflect.DeepEqual(a, b) {
-				failed(L, "==", LValueToString(L.Get(1)), LValueToString(L.Get(2)))
+				failed(L, "==")
 			}
 			return 2
 		},
-		"ne": func(L *lua.LState) int {
-			a := UnpackLValue(L.Get(1))
-			b := UnpackLValue(L.Get(2))
+		"ne": func(L *lua.State) int {
+			a := L.ToAny(1)
+			b := L.ToAny(2)
 			if reflect.DeepEqual(a, b) {
-				failed(L, "~=", LValueToString(L.Get(1)), LValueToString(L.Get(2)))
+				failed(L, "~=")
 			}
 			return 2
 		},
@@ -56,19 +68,18 @@ func RegisterAssert(L *lua.LState) {
 		"ge": order(">=", func(a, b string) bool { return a >= b }, func(a, b float64) bool { return a >= b }),
 	})
 
-	meta := L.SetFuncs(L.NewTable(), map[string]lua.LGFunction{
-		"__call": func(L *lua.LState) int {
-			if !L.ToBool(2) {
-				L.RaiseError("%s", L.OptString(3, "assertion failed!"))
+	L.CreateTable(0, 2)
+	L.SetFunction(-1, "__call", func(L *lua.State) int {
+		if !L.ToBoolean(2) {
+			msg := "assertion failed!"
+			if L.Type(3) != lua.Nil {
+				msg = L.ToString(3)
 			}
-			return L.GetTop() - 1
-		},
-		"__tostring": func(L *lua.LState) int {
-			L.Push(lua.LString("assert"))
-			return 1
-		},
+			L.Errorf(1, "%s", msg)
+		}
+		return L.GetTop() - 1
 	})
-	L.SetMetatable(tbl, meta)
+	L.SetMetatable(-2)
 
-	L.SetGlobal("assert", tbl)
+	L.SetGlobal("assert")
 }

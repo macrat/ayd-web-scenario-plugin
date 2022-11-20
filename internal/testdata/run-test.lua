@@ -14,7 +14,9 @@ if os.getenv("TEST_LATENCY") then
     print.latency(tonumber(os.getenv("TEST_LATENCY")))
 end
 
+print('before asserting')
 assert.eq(t("#greeting .target").text, os.getenv("TEST_TEXT"))
+print('after asserting')
 
 if os.getenv("TEST_ERROR") then
     error(os.getenv("TEST_ERROR"))

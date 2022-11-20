@@ -4,16 +4,16 @@ import (
 	"strings"
 
 	"github.com/chromedp/chromedp/kb"
-	"github.com/yuin/gopher-lua"
+	"github.com/macrat/ayd-web-scenario/internal/lua"
 )
 
-func RegisterKey(L *lua.LState) {
-	tbl := L.NewTable()
+func RegisterKey(L *lua.State) {
+	L.CreateTable(0, len(kb.Keys))
 
 	for key, info := range kb.Keys {
-		code := strings.ToLower(string(info.Code[0])) + info.Code[1:]
-		L.SetField(tbl, code, lua.LString(string(key)))
+		name := strings.ToLower(string(info.Code[0])) + info.Code[1:]
+		L.SetString(-1, name, string(key))
 	}
 
-	L.SetGlobal("key", tbl)
+	L.SetGlobal("key")
 }
