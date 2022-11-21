@@ -1,9 +1,35 @@
 package lua
 
 import (
+	"errors"
 	"fmt"
 )
 
+var (
+	ErrRuntime = errors.New("runtime error")
+	ErrMemory  = errors.New("memory allocation error")
+	ErrError   = errors.New("error")
+	ErrSyntax  = errors.New("syntax error")
+	ErrYield   = errors.New("yield")
+	ErrFile    = errors.New("file error")
+	ErrUnknown = errors.New("unknown error")
+)
+
+// LuaError is raw error from Lua.
+type LuaError struct {
+	Kind    error
+	Message string
+}
+
+func (e LuaError) Unwrap() error {
+	return e.Kind
+}
+
+func (e LuaError) Error() string {
+	return e.Message
+}
+
+// Error is an error with traceback.
 type Error struct {
 	Err         error
 	ChunkName   string

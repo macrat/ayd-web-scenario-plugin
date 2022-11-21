@@ -1,7 +1,6 @@
 package lua
 
 import (
-	"errors"
 	"io"
 	"strconv"
 	"strings"
@@ -27,16 +26,6 @@ extern int f_lua_upvalueindex(int);
 extern int f_luaL_getmetatable(lua_State*, const char*);
 */
 import "C"
-
-var (
-	ErrRuntime = errors.New("runtime error")
-	ErrMemory  = errors.New("memory allocation error")
-	ErrError   = errors.New("error")
-	ErrSyntax  = errors.New("syntax error")
-	ErrYield   = errors.New("yield")
-	ErrFile    = errors.New("file error")
-	ErrUnknown = errors.New("unknown error")
-)
 
 const (
 	MultRet = int(C.LUA_MULTRET)
@@ -338,40 +327,6 @@ func (L *State) GetStack(level int) (d Debug, ok bool) {
 	return d, C.lua_getstack(L.state, C.int(level), &ar) != 0
 }
 
-type LuaError struct {
-	Kind    error
-	Message string
-}
-
-func (e LuaError) Unwrap() error {
-	return e.Kind
-}
-
-func (e LuaError) Error() string {
-	return e.Message
-}
-
-func (L *State) getError(errn C.int) error {
-	switch errn {
-	case C.LUA_OK:
-		return nil
-	case C.LUA_ERRRUN:
-		return LuaError{Kind: ErrRuntime, Message: L.ToString(-1)}
-	case C.LUA_ERRMEM:
-		return LuaError{Kind: ErrMemory, Message: L.ToString(-1)}
-	case C.LUA_ERRERR:
-		return LuaError{Kind: ErrError, Message: L.ToString(-1)}
-	case C.LUA_ERRSYNTAX:
-		return LuaError{Kind: ErrSyntax, Message: L.ToString(-1)}
-	case C.LUA_YIELD:
-		return ErrYield
-	case C.LUA_ERRFILE:
-		return LuaError{Kind: ErrFile, Message: L.ToString(-1)}
-	default:
-		return LuaError{Kind: ErrUnknown, Message: L.ToString(-1)}
-	}
-}
-
 func (L *State) Call(nargs, nret int) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -448,6 +403,27 @@ func (L *State) Load(r io.Reader, name string, isFile bool) (err error) {
 	return
 }
 
+func (L *State) getError(errn C.int) error {
+	switch errn {
+	case C.LUA_OK:
+		return nil
+	case C.LUA_ERRRUN:
+		return LuaError{Kind: ErrRuntime, Message: L.ToString(-1)}
+	case C.LUA_ERRMEM:
+		return LuaError{Kind: ErrMemory, Message: L.ToString(-1)}
+	case C.LUA_ERRERR:
+		return LuaError{Kind: ErrError, Message: L.ToString(-1)}
+	case C.LUA_ERRSYNTAX:
+		return LuaError{Kind: ErrSyntax, Message: L.ToString(-1)}
+	case C.LUA_YIELD:
+		return ErrYield
+	case C.LUA_ERRFILE:
+		return LuaError{Kind: ErrFile, Message: L.ToString(-1)}
+	default:
+		return LuaError{Kind: ErrUnknown, Message: L.ToString(-1)}
+	}
+}
+
 // WrapError wraps error by Error and set traceback.
 func (L *State) WrapError(level int, err error) error {
 	e := Error{
@@ -459,7 +435,13 @@ func (L *State) WrapError(level int, err error) error {
 	} else {
 		e.Traceback = L.Traceback(1)
 	}
-	return e
+
+	if e.CurrentLine == 0 && e.Traceback == "stack traceback:" {
+		// fall back to plain error if there is no traceback.
+		return err
+	} else {
+		return e
+	}
 }
 
 // Error raises an error.

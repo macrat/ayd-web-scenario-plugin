@@ -2,6 +2,7 @@ package webscenario
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -11,13 +12,12 @@ import (
 )
 
 func isIncomplete(err error) bool {
-	/* TODO: implement this
-	if lerr, ok := err.(*lua.ApiError); ok {
-		if perr, ok := lerr.Cause.(*parse.Error); ok {
-			return perr.Pos.Line == parse.EOF
+	var e lua.LuaError
+	if errors.As(err, &e) {
+		if e.Kind == lua.ErrSyntax && strings.HasSuffix(e.Message, " near <eof>") {
+			return true
 		}
 	}
-	*/
 	return false
 }
 
