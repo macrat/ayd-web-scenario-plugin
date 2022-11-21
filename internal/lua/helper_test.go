@@ -225,7 +225,7 @@ func TestState_Errorf(t *testing.T) {
 	L.SetGlobal("f")
 
 	err := L.DoString(`f()`)
-	e, ok := err.(lua.Error)
+	e, ok := err.(lua.ErrorWithTrace)
 	if !ok {
 		t.Fatalf("unexpected error found: %s", err)
 	}

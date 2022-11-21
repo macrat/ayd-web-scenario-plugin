@@ -566,7 +566,7 @@ func TestState_Error(t *testing.T) {
 		end
 		g()
 	`)
-	e, ok := err.(lua.Error)
+	e, ok := err.(lua.ErrorWithTrace)
 	if !ok {
 		t.Fatalf("unexpected error found: %s", err)
 	}
@@ -612,7 +612,7 @@ func TestState_Error_rethrow(t *testing.T) {
 	err := L.DoString(`
 		f()
 	`)
-	e, ok := err.(lua.Error)
+	e, ok := err.(lua.ErrorWithTrace)
 	if !ok {
 		t.Fatalf("unexpected error found: %s", err)
 	}

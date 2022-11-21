@@ -24,6 +24,7 @@ extern char* gReader(lua_State*, void*, size_t*);
 
 extern int f_lua_upvalueindex(int);
 extern int f_luaL_getmetatable(lua_State*, const char*);
+extern int error_message_handler(lua_State*);
 */
 import "C"
 
@@ -113,6 +114,9 @@ var (
 // This method returns nil if the userdata is not set by this library.
 func (L *State) ToUserdata(index int) any {
 	id := (*C.int)(unsafe.Pointer(C.lua_touserdata(L.state, C.int(index))))
+	if id == nil {
+		return nil
+	}
 	return userdata.Get(int(*id))
 }
 
@@ -145,7 +149,9 @@ func (L *State) PushNumber(n float64) {
 //export gUserdataCollector
 func gUserdataCollector(state *C.lua_State) C.int {
 	id := (*C.int)(unsafe.Pointer(C.lua_touserdata(state, 1)))
-	userdata.Pop(int(*id))
+	if id != nil {
+		userdata.Pop(int(*id))
+	}
 	return 0
 }
 
@@ -153,6 +159,10 @@ func gUserdataCollector(state *C.lua_State) C.int {
 // This method sets metatable for garbage collecting. You should reuse that metatable to prevent memory leak if you use your own metatable.
 func (L *State) PushUserdata(v any) {
 	id := (*C.int)(unsafe.Pointer(C.lua_newuserdatauv(L.state, C.sizeof_int, 1)))
+	if id == nil {
+		L.Errorf(1, "failed to create userdata")
+	}
+
 	*id = C.int(userdata.Push(v))
 
 	L.CreateTable(0, 1)
@@ -330,15 +340,23 @@ func (L *State) GetStack(level int) (d Debug, ok bool) {
 func (L *State) Call(nargs, nret int) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
-			if e, ok := r.(error); ok && e != nil {
-				err = e
+			_, lok := r.(LuaError)
+			_, tok := r.(ErrorWithTrace)
+			if lok || tok {
+				err = r.(error)
 			} else {
 				panic(r)
 			}
 		}
 	}()
 
-	err = L.getError(C.lua_pcallk(L.state, C.int(nargs), C.int(nret), 0, 0, nil))
+	C.lua_pushcclosure(L.state, C.lua_CFunction(C.error_message_handler), 0)
+	L.Rotate(1, 1)
+
+	err = L.getError(C.lua_pcallk(L.state, C.int(nargs), C.int(nret), 1, 0, nil))
+	if err == nil {
+		L.Remove(1)
+	}
 	return
 }
 
@@ -346,6 +364,10 @@ var (
 	readers      = newStore[io.Reader]()
 	readerChunks = newSyncMap[int, unsafe.Pointer]()
 )
+
+type loadError struct {
+	Err error
+}
 
 //export gReader
 func gReader(state *C.lua_State, data *C.void, size *C.size_t) *C.char {
@@ -367,7 +389,7 @@ func gReader(state *C.lua_State, data *C.void, size *C.size_t) *C.char {
 		*size = 0
 		return nil
 	} else if err != nil {
-		panic(err)
+		panic(loadError{err})
 	}
 
 	*size = C.size_t(n)
@@ -383,8 +405,8 @@ func (L *State) Load(r io.Reader, name string, isFile bool) (err error) {
 	defer func() {
 		readers.Pop(id)
 		if r := recover(); r != nil {
-			if e, ok := r.(error); ok && e != nil {
-				err = e
+			if e, ok := r.(loadError); ok {
+				err = e.Err
 			} else {
 				panic(r)
 			}
@@ -424,9 +446,9 @@ func (L *State) getError(errn C.int) error {
 	}
 }
 
-// WrapError wraps error by Error and set traceback.
+// WrapError wraps error by ErrorWithTrace and set traceback.
 func (L *State) WrapError(level int, err error) error {
-	e := Error{
+	e := ErrorWithTrace{
 		Err: err,
 	}
 	if level > 0 {
@@ -447,7 +469,7 @@ func (L *State) WrapError(level int, err error) error {
 // Error raises an error.
 // This method throws panic of Go to catch by Call method.
 func (L *State) Error(level int, err error) {
-	if _, ok := err.(Error); ok {
+	if _, ok := err.(ErrorWithTrace); ok {
 		panic(err)
 	} else {
 		panic(L.WrapError(level, err))

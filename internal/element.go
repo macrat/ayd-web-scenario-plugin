@@ -280,6 +280,29 @@ func RegisterElementType(ctx context.Context, L *lua.State) {
 		}
 	}
 
+	methods := map[string]lua.GFunction{
+		"all": func(L *lua.State) int {
+			e := CheckElement(L)
+			query := L.CheckString(2)
+			e.SelectAll(L, query)
+			return 1
+		},
+		"sendKeys":   fn(Element.SendKeys),
+		"setValue":   fn(Element.SetValue),
+		"click":      fn(Element.Click),
+		"submit":     fn(Element.Submit),
+		"focus":      fn(Element.Focus),
+		"blur":       fn(Element.Blur),
+		"screenshot": fn(Element.Screenshot),
+	}
+
+	getters := map[string]func(Element, *lua.State) int{
+		"text":      Element.GetText,
+		"innerHTML": Element.GetInnerHTML,
+		"outerHTML": Element.GetOuterHTML,
+		"value":     Element.GetValue,
+	}
+
 	L.NewTypeMetatable("element")
 
 	L.SetFuncs(-1, map[string]lua.GFunction{
@@ -293,48 +316,20 @@ func RegisterElementType(ctx context.Context, L *lua.State) {
 			L.PushString(fmt.Sprintf("%s", CheckElement(L).name))
 			return 1
 		},
-	})
+		"__index": func(L *lua.State) int {
+			e := CheckElement(L)
+			name := L.CheckString(2)
 
-	L.CreateTable(0, 0)
-	{
-		L.SetFuncs(-1, map[string]lua.GFunction{
-			"all": func(L *lua.State) int {
-				e := CheckElement(L)
-				query := L.CheckString(2)
-				e.SelectAll(L, query)
+			if m, ok := methods[name]; ok {
+				L.PushFunction(m)
 				return 1
-			},
-			"sendKeys":   fn(Element.SendKeys),
-			"setValue":   fn(Element.SetValue),
-			"click":      fn(Element.Click),
-			"submit":     fn(Element.Submit),
-			"focus":      fn(Element.Focus),
-			"blur":       fn(Element.Blur),
-			"screenshot": fn(Element.Screenshot),
-		})
-
-		L.CreateTable(0, 0)
-		{
-			L.PushFunction(func(L *lua.State) int {
-				e := CheckElement(L)
-				switch L.CheckString(2) {
-				case "text":
-					return e.GetText(L)
-				case "innerHTML":
-					return e.GetInnerHTML(L)
-				case "outerHTML":
-					return e.GetOuterHTML(L)
-				case "value":
-					return e.GetValue(L)
-				default:
-					return e.GetAttribute(L)
-				}
-			})
-			L.SetField(-2, "__index")
-		}
-		L.SetMetatable(-2)
-	}
-	L.SetField(-2, "__index")
+			} else if g, ok := getters[name]; ok {
+				return g(e, L)
+			} else {
+				return e.GetAttribute(L)
+			}
+		},
+	})
 
 	L.SetGlobal("element")
 }

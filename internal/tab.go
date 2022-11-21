@@ -452,7 +452,7 @@ func (t *Tab) GetDialogs(L *lua.LState) int {
 	return 1
 }
 
-func (t *Tab) GetDownload(L *lua.LState) int {
+func (t *Tab) GetDownloads(L *lua.LState) int {
 	L.Push(t.downloadEvent.Status(L))
 	return 1
 }
@@ -570,6 +570,52 @@ func RegisterTabType(ctx context.Context, env *Environment, L *lua.State) {
 		}
 	}
 
+	methods := map[string]lua.GFunction{
+		"go":               fn((*Tab).Go),
+		"forward":          fn((*Tab).Forward),
+		"back":             fn((*Tab).Back),
+		"reload":           fn((*Tab).Reload),
+		"close":            fn((*Tab).LClose),
+		"screenshot":       fn((*Tab).Screenshot),
+		"wait":             fn((*Tab).Wait),
+		"waitXPath":        fn((*Tab).WaitXPath),
+		"waitVisible":      fn((*Tab).WaitVisible),
+		"waitXPathVisible": fn((*Tab).WaitXPathVisible),
+		/*
+			"waitDialog":       fret((*Tab).WaitDialog),
+			"waitDownload":     fret((*Tab).WaitDownload),
+			"waitRequest":      fret((*Tab).WaitRequest),
+			"waitResponse":     fret((*Tab).WaitResponse),
+			"onDialog":         fn((*Tab).OnDialog),
+			"onDownload":       fn((*Tab).OnDownload),
+			"onRequest":        fn((*Tab).OnRequest),
+			"onResponse":       fn((*Tab).OnResponse),
+		*/
+		"all": func(L *lua.State) int {
+			t := CheckTab(L)
+			query := L.CheckString(2)
+			PushElementsTable(L, t, query)
+			return 1
+		},
+		"xpath": func(L *lua.State) int {
+			t := CheckTab(L)
+			query := L.CheckString(2)
+			PushElementsTableByXPath(L, t, query)
+			return 1
+		},
+		"eval": fret((*Tab).Eval),
+	}
+
+	getters := map[string]func(*Tab, *lua.State) int{
+		"url":      (*Tab).GetURL,
+		"title":    (*Tab).GetTitle,
+		"viewport": (*Tab).GetViewport,
+		//"dialogs":   (*Tab).GetDialogs,
+		//"downloads": (*Tab).GetDownloads,
+		//"requests":  (*Tab).GetRequest,
+		//"responses": (*Tab).GetResponse,
+	}
+
 	id := 0
 
 	L.NewTypeMetatable("tab")
@@ -589,71 +635,20 @@ func RegisterTabType(ctx context.Context, env *Environment, L *lua.State) {
 			L.PushString(fmt.Sprintf("tab#%d", CheckTab(L).id))
 			return 1
 		},
-	})
-
-	L.CreateTable(0, 0)
-	{
-		L.SetFuncs(-1, map[string]lua.GFunction{
-			"go":               fn((*Tab).Go),
-			"forward":          fn((*Tab).Forward),
-			"back":             fn((*Tab).Back),
-			"reload":           fn((*Tab).Reload),
-			"close":            fn((*Tab).LClose),
-			"screenshot":       fn((*Tab).Screenshot),
-			"wait":             fn((*Tab).Wait),
-			"waitXPath":        fn((*Tab).WaitXPath),
-			"waitVisible":      fn((*Tab).WaitVisible),
-			"waitXPathVisible": fn((*Tab).WaitXPathVisible),
-			/*
-				"waitDialog":       fret((*Tab).WaitDialog),
-				"waitDownload":     fret((*Tab).WaitDownload),
-				"waitRequest":      fret((*Tab).WaitRequest),
-				"waitResponse":     fret((*Tab).WaitResponse),
-				"onDialog":         fn((*Tab).OnDialog),
-				"onDownload":       fn((*Tab).OnDownload),
-				"onRequest":        fn((*Tab).OnRequest),
-				"onResponse":       fn((*Tab).OnResponse),
-			*/
-			"all": func(L *lua.State) int {
-				t := CheckTab(L)
-				query := L.CheckString(2)
-				PushElementsTable(L, t, query)
-				return 1
-			},
-			"xpath": func(L *lua.State) int {
-				t := CheckTab(L)
-				query := L.CheckString(2)
-				PushElementsTableByXPath(L, t, query)
-				return 1
-			},
-			"eval": fret((*Tab).Eval),
-		})
-
-		L.CreateTable(0, 0)
-		L.SetFunction(-1, "__index", func(L *lua.State) int {
+		"__index": func(L *lua.State) int {
 			t := CheckTab(L)
+			name := L.CheckString(2)
 
-			switch L.CheckString(2) {
-			case "url":
-				return t.GetURL(L)
-			case "title":
-				return t.GetTitle(L)
-			case "viewport":
-				return t.GetViewport(L)
-			case "dialogs":
-				//return t.GetDialogs(L)
-			case "downloads":
-				//return t.GetDownload(L)
-			case "requests":
-				//return t.GetRequest(L)
-			case "responses":
-				//return t.GetResponse(L)
+			if m, ok := methods[name]; ok {
+				L.PushFunction(m)
+				return 1
+			} else if g, ok := getters[name]; ok {
+				return g(t, L)
+			} else {
+				return 0
 			}
-			return 0
-		})
-		L.SetMetatable(-2)
-	}
-	L.SetField(-2, "__index")
+		},
+	})
 
 	L.SetGlobal("tab")
 }

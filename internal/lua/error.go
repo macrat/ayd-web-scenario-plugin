@@ -29,23 +29,23 @@ func (e LuaError) Error() string {
 	return e.Message
 }
 
-// Error is an error with traceback.
-type Error struct {
+// ErrorWithTrace is an error with traceback.
+type ErrorWithTrace struct {
 	Err         error
 	ChunkName   string
 	CurrentLine int
 	Traceback   string
 }
 
-func (err Error) OneLine() string {
+func (err ErrorWithTrace) OneLine() string {
 	return fmt.Sprintf("%s:%d: %s", err.ChunkName, err.CurrentLine, err.Err)
 }
 
-func (err Error) Error() string {
+func (err ErrorWithTrace) Error() string {
 	return err.OneLine() + "\n" + err.Traceback
 }
 
-func (err Error) Unwrap() error {
+func (err ErrorWithTrace) Unwrap() error {
 	return err.Err
 }
 
@@ -57,7 +57,7 @@ func pcall(L *State) int {
 		return L.GetTop()
 	} else {
 		L.PushBoolean(false)
-		if e, ok := err.(Error); ok {
+		if e, ok := err.(ErrorWithTrace); ok {
 			L.PushString(e.OneLine())
 		} else {
 			L.PushString(err.Error())

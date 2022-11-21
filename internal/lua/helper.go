@@ -3,6 +3,7 @@ package lua
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"reflect"
@@ -57,21 +58,21 @@ func (L *State) toTable(index int, toAny func(index int) any) any {
 	return array
 }
 
-type NoCompatValue struct {
-	ToString string
+type IncompatibleValue struct {
+	S string
 }
 
-func (v NoCompatValue) String() string {
-	return v.ToString
+func (v IncompatibleValue) String() string {
+	return v.S
 }
 
-func (v NoCompatValue) MarshalJSON() ([]byte, error) {
-	return json.Marshal(v.ToString)
+func (v IncompatibleValue) MarshalJSON() ([]byte, error) {
+	return json.Marshal(v.S)
 }
 
 func (L *State) ToAny(index int) any {
 	switch L.Type(index) {
-	case Nil:
+	case Nil, None:
 		return nil
 	case Boolean:
 		return L.ToBoolean(index)
@@ -88,13 +89,13 @@ func (L *State) ToAny(index int) any {
 	case Userdata:
 		return L.ToUserdata(index)
 	default:
-		return NoCompatValue{L.ToString(index)}
+		return IncompatibleValue{L.ToString(index)}
 	}
 }
 
 func (L *State) ToAnyButInteger(index int) any {
 	switch L.Type(index) {
-	case Nil:
+	case Nil, None:
 		return nil
 	case Boolean:
 		return L.ToBoolean(index)
@@ -107,7 +108,7 @@ func (L *State) ToAnyButInteger(index int) any {
 	case Userdata:
 		return L.ToUserdata(index)
 	default:
-		return NoCompatValue{L.ToString(index)}
+		return IncompatibleValue{L.ToString(index)}
 	}
 }
 
@@ -267,6 +268,16 @@ func (L *State) DoString(code string) error {
 // CallWithContext calls Lua function with context.
 // Don't use this function with SetHook because it uses SetHook internally.
 func (L *State) CallWithContext(ctx context.Context, nargs, nret int) (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			if e, ok := r.(error); ok && errors.Is(e, context.Canceled) || errors.Is(e, context.DeadlineExceeded) {
+				err = e
+			} else {
+				panic(r)
+			}
+		}
+	}()
+
 	L.SetHook(MaskLine|MaskCount, 1000, func(L *State, d Debug) {
 		select {
 		case <-ctx.Done():
@@ -294,7 +305,7 @@ func (L *State) Errorf(level int, format string, args ...any) {
 }
 
 func (L *State) ArgErrorf(arg int, format string, args ...any) {
-	if d, ok := L.GetStack(1); ok {
+	if d, ok := L.GetStack(0); ok {
 		funcName := d.Name().Name
 		L.Errorf(1, "bad argument #%d to '%s' (%s)", arg, funcName, fmt.Sprintf(format, args...))
 	} else {

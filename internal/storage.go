@@ -203,6 +203,7 @@ func (s *Storage) Register(env *Environment, L *lua.State) {
 		}
 		return 0
 	})
+	L.SetMetatable(-2)
 
 	L.SetGlobal("artifact")
 }

@@ -14,7 +14,6 @@ func PushFileLikeMeta(L *lua.State, r io.Reader) {
 	L.CreateTable(0, 1)
 	{
 		L.GetTypeMetatable("filelike")
-		L.SetNil(-1, "__name")
 		L.SetMetatable(-2)
 
 		L.PushUserdata(bufio.NewReader(r))
@@ -39,89 +38,92 @@ func RegisterFileLike(L *lua.State) {
 	}
 
 	L.NewTypeMetatable("filelike")
-	L.CreateTable(0, 2)
-	L.SetFuncs(-1, map[string]lua.GFunction{
-		"lines": func(L *lua.State) int {
-			r := checkFileReader(L)
+	{
+		L.CreateTable(0, 2)
+		L.SetFuncs(-1, map[string]lua.GFunction{
+			"lines": func(L *lua.State) int {
+				r := checkFileReader(L)
 
-			L.PushFunction(func(L *lua.State) int {
-				buf, _, err := r.ReadLine()
-				if err == io.EOF {
-					return 0
-				} else if err != nil {
-					L.Error(1, err)
-				}
-				L.PushString(string(buf))
-				return 1
-			})
-			return 1
-		},
-		"read": func(L *lua.State) int {
-			r := checkFileReader(L)
-			n := L.GetTop()
-
-			if n == 1 {
-				L.PushString("l")
-				n = 2
-			}
-
-			for i := 2; i <= n; i++ {
-				switch L.Type(i) {
-				case lua.String:
-					format := L.ToString(i)
-					if format[:1] == "*" {
-						format = format[1:]
-					}
-					switch format[:1] {
-					case "n":
-						var buf float64
-						_, err := fmt.Fscanf(r, "%f", &buf)
-						if err == io.EOF {
-							return i - 2
-						} else if err != nil {
-							L.Error(1, err)
-						}
-						L.PushNumber(buf)
-					case "a":
-						buf, err := io.ReadAll(r)
-						if err == io.EOF {
-							return i - 2
-						} else if err != nil {
-							L.Error(1, err)
-						}
-						L.PushString(string(buf))
-					case "l", "L", "":
-						buf, _, err := r.ReadLine()
-						if err == io.EOF {
-							return i - 2
-						} else if err != nil {
-							L.Error(1, err)
-						}
-						if format[:1] == "L" {
-							buf = append(buf, '\n')
-						}
-						L.PushString(string(buf))
-					default:
-						L.ArgErrorf(i, "invalid format %q", L.ToString(i)) // don't use format because it drops "*".
-					}
-				case lua.Number:
-					buf := make([]byte, int(L.ToNumber(i)))
-					_, err := r.Read(buf)
+				L.PushFunction(func(L *lua.State) int {
+					buf, _, err := r.ReadLine()
 					if err == io.EOF {
-						return i - 2
+						return 0
 					} else if err != nil {
 						L.Error(1, err)
 					}
 					L.PushString(string(buf))
-				default:
-					L.ArgErrorf(i, "string or number expected, got %s", L.Type(i))
-				}
-			}
+					return 1
+				})
+				return 1
+			},
+			"read": func(L *lua.State) int {
+				r := checkFileReader(L)
+				n := L.GetTop()
 
-			return n - 1
-		},
-	})
-	L.SetField(-2, "__index")
+				if n == 1 {
+					L.PushString("l")
+					n = 2
+				}
+
+				for i := 2; i <= n; i++ {
+					switch L.Type(i) {
+					case lua.String:
+						format := L.ToString(i)
+						if format[:1] == "*" {
+							format = format[1:]
+						}
+						switch format[:1] {
+						case "n":
+							var buf float64
+							_, err := fmt.Fscanf(r, "%f", &buf)
+							if err == io.EOF {
+								return i - 2
+							} else if err != nil {
+								L.Error(1, err)
+							}
+							L.PushNumber(buf)
+						case "a":
+							buf, err := io.ReadAll(r)
+							if err == io.EOF {
+								return i - 2
+							} else if err != nil {
+								L.Error(1, err)
+							}
+							L.PushString(string(buf))
+						case "l", "L", "":
+							buf, _, err := r.ReadLine()
+							if err == io.EOF {
+								return i - 2
+							} else if err != nil {
+								L.Error(1, err)
+							}
+							if format[:1] == "L" {
+								buf = append(buf, '\n')
+							}
+							L.PushString(string(buf))
+						default:
+							L.ArgErrorf(i, "invalid format %q", L.ToString(i)) // don't use format because it drops "*".
+						}
+					case lua.Number:
+						buf := make([]byte, int(L.ToNumber(i)))
+						_, err := r.Read(buf)
+						if err == io.EOF {
+							return i - 2
+						} else if err != nil {
+							L.Error(1, err)
+						}
+						L.PushString(string(buf))
+					default:
+						L.ArgErrorf(i, "string or number expected, got %s", L.Type(i))
+					}
+				}
+
+				return n - 1
+			},
+		})
+		L.SetField(-2, "__index")
+	}
+	L.Pop(1)
 }
 
 type DelayedReader struct {
