@@ -30,7 +30,7 @@ func (L *State) Swap(a, b int) {
 	L.Replace(b)
 }
 
-func (L *State) toTable(index int) any {
+func (L *State) toTable(index int, toAny func(index int) any) any {
 	index = L.AbsIndex(index)
 
 	values := make(map[string]any)
@@ -39,7 +39,7 @@ func (L *State) toTable(index int) any {
 
 	L.PushNil()
 	for L.Next(index) {
-		x := L.ToAny(-1)
+		x := toAny(-1)
 
 		values[L.ToString(-2)] = x
 		if intOnly && L.IsInteger(-2) && int(L.ToInteger(-2)) <= len(array) {
@@ -84,7 +84,26 @@ func (L *State) ToAny(index int) any {
 	case String:
 		return L.ToString(index)
 	case Table:
-		return L.toTable(index)
+		return L.toTable(index, L.ToAny)
+	case Userdata:
+		return L.ToUserdata(index)
+	default:
+		return NoCompatValue{L.ToString(index)}
+	}
+}
+
+func (L *State) ToAnyButInteger(index int) any {
+	switch L.Type(index) {
+	case Nil:
+		return nil
+	case Boolean:
+		return L.ToBoolean(index)
+	case Number:
+		return L.ToNumber(index)
+	case String:
+		return L.ToString(index)
+	case Table:
+		return L.toTable(index, L.ToAnyButInteger)
 	case Userdata:
 		return L.ToUserdata(index)
 	default:

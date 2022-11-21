@@ -47,16 +47,16 @@ func RegisterAssert(L *lua.State) {
 	L.CreateTable(0, 6)
 	L.SetFuncs(-1, map[string]lua.GFunction{
 		"eq": func(L *lua.State) int {
-			a := L.ToAny(1)
-			b := L.ToAny(2)
+			a := L.ToAnyButInteger(1)
+			b := L.ToAnyButInteger(2)
 			if !reflect.DeepEqual(a, b) {
 				failed(L, "==")
 			}
 			return 2
 		},
 		"ne": func(L *lua.State) int {
-			a := L.ToAny(1)
-			b := L.ToAny(2)
+			a := L.ToAnyButInteger(1)
+			b := L.ToAnyButInteger(2)
 			if reflect.DeepEqual(a, b) {
 				failed(L, "~=")
 			}
