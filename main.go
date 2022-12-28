@@ -24,7 +24,7 @@ func init() {
 }
 
 func ParseTargetURL(s string) (mode string, url *ayd.URL, err error) {
-	if s == "-" {
+	if s == "-" || s == "" {
 		return "repl", &ayd.URL{Scheme: "web-scenario", Opaque: "<stdin>"}, nil
 	}
 
@@ -133,6 +133,10 @@ func main() {
 	switch arg.Mode {
 	case "ayd":
 		arg.Timeout = 50 * time.Minute
+		if arg.Target.Opaque == "" {
+			ayd.NewLogger(arg.Target).Unknown("filename in URL is required.", nil)
+			return
+		}
 	case "repl":
 		if !readline.DefaultIsTerminal() {
 			arg.Mode = "stdin"
