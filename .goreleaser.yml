@@ -33,10 +33,7 @@ archives:
     format_overrides:
       - goos: windows
         format: zip
-    files:
-      - src: 'scripts/{{ .Os }}/*'
-        dst: .
-        strip_parent: true
+    files: [none*]
 
 changelog:
   filters:

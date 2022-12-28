@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/chzyer/readline"
-	"github.com/macrat/ayd-web-scenario/internal"
+	"github.com/macrat/ayd-web-scenario-scheme/internal"
 	"github.com/macrat/ayd/lib-ayd"
 	"github.com/spf13/pflag"
 )
@@ -81,15 +81,14 @@ func main() {
 		fmt.Println("Ayd Web-Scenario")
 		fmt.Println()
 		fmt.Println("Standalone mode:")
-		fmt.Println("  $ ayd-web-scenario [OPTIONS] FILE [ARGS...]")
+		fmt.Println("  $ ayd-web-scenario-scheme [OPTIONS] FILE [ARGS...]")
 		fmt.Println()
 		fmt.Println("REPL mode:")
-		fmt.Println("  $ ayd-web-scenario [OPTIONS]")
-		fmt.Println("  $ ayd-web-scenario [OPTIONS] - [ARGS...]")
+		fmt.Println("  $ ayd-web-scenario-scheme [OPTIONS]")
+		fmt.Println("  $ ayd-web-scenario-scheme [OPTIONS] - [ARGS...]")
 		fmt.Println()
 		fmt.Println("Ayd plugin mode:")
-		fmt.Println("  $ ayd-web-scenario URL")
-		fmt.Println("  $ ayd-web-scenario URL TIMESTAMP STATUS LATENCY TARGET_URL MESSAGE EXTRA")
+		fmt.Println("  $ ayd-web-scenario-scheme URL [RECORD]")
 		fmt.Println()
 		fmt.Println("OPTIONS")
 		flags.PrintDefaults()
@@ -119,17 +118,11 @@ func main() {
 		}
 		if arg.Mode != "ayd" {
 			arg.Args = flags.Args()[1:]
-		} else if len(flags.Args()) == 7 {
-			if as, err := ayd.ParseAlertPluginArgsFrom(append([]string{os.Args[0]}, flags.Args()...)); err != nil {
+		} else if len(flags.Args()) == 2 {
+			arg.Alert, err = ayd.ParseRecord(flags.Arg(1))
+			if err != nil {
 				fmt.Fprintf(os.Stderr, "%s\nPlease see `%s -h` for more information.\n", err, os.Args[0])
 				os.Exit(2)
-			} else {
-				arg.Alert.Time = as.Time
-				arg.Alert.Status = as.Status
-				arg.Alert.Latency = as.Latency
-				arg.Alert.Target = as.TargetURL
-				arg.Alert.Message = as.Message
-				arg.Alert.Extra = as.Extra
 			}
 		} else if len(flags.Args()) != 1 {
 			fmt.Fprintf(os.Stderr, "1 or 7 arguments required in Ayd mode.\nPlease see `%s -h` for more information.\n", os.Args[0])
