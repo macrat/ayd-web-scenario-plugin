@@ -2,9 +2,9 @@ package webscenario
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 	"time"
-	"strings"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/macrat/ayd/lib-ayd"
@@ -58,7 +58,7 @@ func TestRun(t *testing.T) {
 			Text:    "incorrect",
 			Latency: "0",
 			Record: ayd.Record{
-				Status:  ayd.StatusFailure,
+				Status: ayd.StatusFailure,
 				Message: strings.Join([]string{
 					`It's working!`,
 					`./testdata/run-test.lua:17: assertion failed: "world" == "incorrect"`,
@@ -75,7 +75,7 @@ func TestRun(t *testing.T) {
 			Text:    "incorrect",
 			Extra:   "hello",
 			Record: ayd.Record{
-				Status:  ayd.StatusFailure,
+				Status: ayd.StatusFailure,
 				Message: strings.Join([]string{
 					`It's working!`,
 					`./testdata/run-test.lua:17: assertion failed: "world" == "incorrect"`,
@@ -106,7 +106,7 @@ func TestRun(t *testing.T) {
 			Text:    "world",
 			Error:   "something",
 			Record: ayd.Record{
-				Status:  ayd.StatusFailure,
+				Status: ayd.StatusFailure,
 				Message: strings.Join([]string{
 					`It's working!`,
 					`./testdata/run-test.lua:20: something`,
