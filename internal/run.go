@@ -11,11 +11,21 @@ import (
 	"github.com/macrat/ayd/lib-ayd"
 )
 
+func getenv(name ...string) string {
+	for _, n := range name {
+		if v := os.Getenv(n); v != "" {
+			return v
+		}
+	}
+	return ""
+}
+
 func NewExecAllocator(ctx context.Context, withHead bool) (context.Context, context.CancelFunc) {
 	opts := []chromedp.ExecAllocatorOption{
 		chromedp.NoFirstRun,
 		chromedp.NoDefaultBrowserCheck,
 		chromedp.WindowSize(800, 800),
+		chromedp.ProxyServer(getenv("webscenario_proxy", "WEBSCENARIO_PROXY", "all_proxy", "ALL_PROXY", "https_proxy", "HTTPS_PROXY", "http_proxy", "HTTP_PROXY")),
 
 		chromedp.Flag("disable-background-networking", true),
 		chromedp.Flag("enable-features", "NetworkService,NetworkServiceInProcess"),
